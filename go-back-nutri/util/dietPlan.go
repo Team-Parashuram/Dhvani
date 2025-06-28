@@ -26,7 +26,7 @@ func TT(height int, weight int, bloodGroup string, gender string, openAI_API str
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return models.TimeTable{}, fmt.Errorf("marshal payload: %w", err)
+		return nil, fmt.Errorf("marshal payload: %w", err)
 	}
 
 	client := resty.New()
@@ -35,29 +35,25 @@ func TT(height int, weight int, bloodGroup string, gender string, openAI_API str
 		SetHeader("Authorization", "Bearer "+openAI_API).
 		SetBody(jsonData).
 		Post("https://openrouter.ai/api/v1/chat/completions")
+
 	if err != nil {
-		return models.TimeTable{}, fmt.Errorf("request error: %w", err)
+		return nil, fmt.Errorf("request error: %w", err)
 	}
+
 	if res.IsError() {
-		return models.TimeTable{}, fmt.Errorf("api error: %s", res.String())
+		return nil, fmt.Errorf("api error: %s", res.String())
 	}
 
-	var llmResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
+	var parsed map[string]any
+	if err := json.Unmarshal(res.Body(), &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	if err := json.Unmarshal(res.Body(), &llmResp); err != nil {
-		return models.TimeTable{}, fmt.Errorf("unmarshal envelope: %w", err)
-	}
-	if len(llmResp.Choices) == 0 {
-		return models.TimeTable{}, fmt.Errorf("no choices in response")
-	}
+	choices := parsed["choices"].([]any)
+	first := choices[0].(map[string]any)
+	message := first["message"].(map[string]any)
+	content := message["content"].(string)
 
-	raw := llmResp.Choices[0].Message.Content
+	return content, nil
 
-	return raw, nil
 }
