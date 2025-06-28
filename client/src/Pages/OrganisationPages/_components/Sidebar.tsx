@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, BarChart, Package, MapPin, Droplet, Activity, User2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Upload, BarChart, Package, MapPin, Droplet, Activity, User2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -8,11 +8,12 @@ import { useUserStore } from "@/store/useUserStore"
 import { useThemeStore } from "@/store/themeStore"
 
 interface SidebarProps {
-    setActiveTab: (tab: "analytics" | "inventory" | "locations" | "requests" | "donation" | "profile") => void
+    setActiveTab: (tab: "analytics" | "inventory" |  "stroke-detection" | "locations" | "requests" | "donation" | "profile") => void
     activeTab: string
     }
 
     const sidebarItems = [
+    { icon: Upload, label: "Stroke Detection", id: "stroke-detection" },
     { icon: Activity, label: "Add Blood Donation", id: "donation" },
     { icon: Droplet, label: "See Blood Requests", id: "requests" },
     { icon: BarChart, label: "Analytics", id: "analytics" },

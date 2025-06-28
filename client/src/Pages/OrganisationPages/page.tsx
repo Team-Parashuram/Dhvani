@@ -10,16 +10,19 @@ import OrganizationBloodRequests from "./_components/BloodRequests"
 import BloodDonation from "./_components/BloodDonation"
 import OrganisationAnalytics from "./_components/OrganisationAnalytics"
 import Profile from "./_components/Profile"
+import StrokeAssessment from "./_components/StrokeAssessment/StrokeDetection"
 
 
 const Organisation = () => {
-    const [activeTab, setActiveTab] = useState<"analytics" | "inventory" | "locations" | "requests" | "donation" | "profile">(
+    const [activeTab, setActiveTab] = useState<"analytics" | "inventory" | "stroke-detection" | "locations" | "requests" | "donation" | "profile">(
         "analytics",
     )
     const { theme } = useThemeStore()
 
     const renderContent = () => {
         switch (activeTab) {
+        case "stroke-detection": 
+                return <StrokeAssessment />
         case "analytics":
             return <OrganisationAnalytics />
         case "inventory":

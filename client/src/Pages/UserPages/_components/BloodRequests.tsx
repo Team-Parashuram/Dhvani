@@ -5,7 +5,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { Types } from "mongoose"
 import axiosInstance from "@/util/axiosInstance"
 import { motion } from "framer-motion"
 import { useThemeStore } from "@/store/themeStore"
@@ -15,7 +14,7 @@ import { toast } from "react-hot-toast"
 
 interface IBloodRequest {
     _id: string
-    patientId: Types.ObjectId
+    patientId: string
     quantity: string
     type: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-"
     completed: boolean

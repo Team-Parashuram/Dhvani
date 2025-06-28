@@ -9,7 +9,7 @@ import { useThemeStore } from "@/store/themeStore"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SidebarProps {
-    setActiveTab: (tab: "availability" | "requests" | "find-hospital" | "chatbot" | "faq" | "profile" | "my-reports" | "disease-checker" | "tb-detection" | "stroke-detection" | "diet-planner") => void
+    setActiveTab: (tab: "availability" | "requests" | "find-hospital" | "chatbot" | "faq" | "profile" | "my-reports" | "disease-checker" | "tb-detection" | "diet-planner") => void
     activeTab: string
     isCollapsed: boolean
     setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>
@@ -18,7 +18,6 @@ interface SidebarProps {
 const sidebarItems = [
     { icon: Activity, label: "Disease Checker", id: "disease-checker" },
     { icon: Upload, label: "TB Detection", id: "tb-detection" },
-    { icon: Upload, label: "Stroke Detection", id: "stroke-detection" },
     { icon: FileText, label: "My Reports", id: "my-reports" },
     {icon: Hospital, label: "Find Hospital near me", id: "find-hospital"},
     { icon: Droplet, label: "Blood Availability", id: "availability" },
