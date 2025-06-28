@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react"
 import BloodAvailability from "./_components/BloodAvailability"
 import PatientBloodRequests from "./_components/BloodRequests"
-import axiosInstance from "@/util/axiosInstance"
 import Navbar from "@/components/Navbar"
 import { motion } from "framer-motion"
 import { Sidebar } from "./_components/Sidebar"
@@ -17,28 +16,13 @@ import TBDetection from "./_components/TBDetection"
 import Nutrition from "./_components/Nutrition"
 import {Chatbot} from "@mishrashardendu22/chatbot-widget";
 
-interface IPatient {
-    _id: string
-    name: string
-    email: string
-    phoneNo?: string
-    bloodGroup?: string
-    dateOfBirth?: string
-    gender ?: string
-    height ?: number
-    weight?: number
-    address?: string
-    aadharNo?: string
-}
 
 const UserPage = () => {
-    const [patientInfo, setPatientInfo] = useState<IPatient | null>(null)
     const [activeTab, setActiveTab] = useState<"availability" | "requests" | "find-hospital"| "chatbot" | "faq" | "profile" | "my-reports" | "disease-checker" | "tb-detection" | "diet-planner">("disease-checker")
     const [isCollapsed, setIsCollapsed] = useState(false)
     const { theme } = useThemeStore()
 
     useEffect(() => {
-        fetchPatientInfo()
         handleResize()
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
@@ -50,14 +34,6 @@ const UserPage = () => {
         }
     }
 
-    const fetchPatientInfo = async () => {
-        try {
-            const { data } = await axiosInstance.get("/user/verifyUser")
-            setPatientInfo(data.data)
-        } catch (error) {
-            console.error("Error fetching user info:", error)
-        }
-    }
 
     const renderContent = () => {
         switch (activeTab) {

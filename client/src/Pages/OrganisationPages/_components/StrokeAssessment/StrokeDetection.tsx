@@ -24,6 +24,8 @@ const StrokeAssessment = () => {
       HeartRate: "",
       Temperature: "",
       OxygenSaturation: "",
+      Height: 0,
+      Weight: 0
     },
     symptoms: {
       Weakness: false,

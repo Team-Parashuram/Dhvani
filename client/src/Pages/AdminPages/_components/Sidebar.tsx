@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, BarChart2, Users, UserPlus, Building2, MapPin, Droplet, LogOut } from "lucide-react"
+import { ChevronLeft, ChevronRight, BarChart2, Users, UserPlus, Building2, MapPin, Droplet} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
