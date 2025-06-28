@@ -6,11 +6,13 @@ conda activate medsam2
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 
 ## Install other dependencies
-pip install flask pillow numpy opencv-python huggingface-hub
-pip install git+https://github.com/facebookresearch/segment-anything.git
+pip install -r requirements.txt
 
 ## Download models
 python download_models.py
+
+## Run tb.py (temp)
+python tb.py
 
 ## Verify setup
 python verify_setup.py
