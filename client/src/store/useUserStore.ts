@@ -6,6 +6,10 @@ interface User {
     email: string
     token: string
     address: string
+    height: number
+    weight: number
+    bloodGroup: string
+    gender: string
 }
 
 interface UserState {

@@ -11,28 +11,23 @@ import { useThemeStore } from "@/store/themeStore";
 import { 
     Apple, 
     TrendingUp, 
-    Calendar, 
+    BookOpen, 
     Utensils, 
-    Coffee, 
-    Sun, 
-    Moon, 
     AlertCircle,
     ChefHat,
-    Activity
+    Activity,
+    Lightbulb,
+    Target,
+    Heart
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-const base_link = "https://nutrition-calculator-hvzj.onrender.com";
-
-type WeeklyPlan = Record<
-    string,
-    Record<"breakfast" | "lunch" | "dinner", string>
->;
+const base_link = "https://dhvani-go-nutri.mayankdev.com";
 
 const Nutrition = () => {
     const [inputDiet, setInputDiet] = useState("");
     const [grade, setGrade] = useState<string | null>(null);
-    const [dietPlan, setDietPlan] = useState<WeeklyPlan | null>(null);
+    const [nutritionAdvice, setNutritionAdvice] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const user = useUserStore((s) => s.user);
     const { theme } = useThemeStore();
@@ -45,13 +40,65 @@ const Nutrition = () => {
         return "bg-red-100 text-red-800 border-red-200";
     };
 
-    const getMealIcon = (mealType: string) => {
-        switch (mealType) {
-            case 'breakfast': return <Coffee className="w-4 h-4" />;
-            case 'lunch': return <Sun className="w-4 h-4" />;
-            case 'dinner': return <Moon className="w-4 h-4" />;
-            default: return <Utensils className="w-4 h-4" />;
+    const parseNutritionAdvice = (advice: string) => {
+        // Split the advice into sections based on markdown headers and content
+        const sections = advice.split(/###?\s*\*?\*?/).filter(section => section.trim());
+        
+        return sections.map((section, index) => {
+            const lines = section.trim().split('\n').filter(line => line.trim());
+            if (lines.length === 0) return null;
+            
+            const title = lines[0].replace(/\*\*/g, '').replace(/:/g, '').trim();
+            const content = lines.slice(1).join('\n').trim();
+            
+            return {
+                id: index,
+                title,
+                content,
+                icon: getSectionIcon(title)
+            };
+        }).filter(Boolean);
+    };
+
+    const getSectionIcon = (title: string) => {
+        const titleLower = title.toLowerCase();
+        if (titleLower.includes('bmi') || titleLower.includes('caloric') || titleLower.includes('status')) {
+            return <Target className="w-5 h-5" />;
         }
+        if (titleLower.includes('goal') || titleLower.includes('nutritional')) {
+            return <Lightbulb className="w-5 h-5" />;
+        }
+        if (titleLower.includes('meal') || titleLower.includes('sample') || titleLower.includes('example')) {
+            return <Utensils className="w-5 h-5" />;
+        }
+        if (titleLower.includes('recommendation') || titleLower.includes('key')) {
+            return <Heart className="w-5 h-5" />;
+        }
+        return <BookOpen className="w-5 h-5" />;
+    };
+
+    const formatContent = (content: string) => {
+        return content
+            .split('\n')
+            .map((line, index) => {
+                line = line.trim();
+                if (!line) return null;
+                if (line.startsWith('- ') || line.startsWith('•')) {
+                    const text = line.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    return (
+                        <li key={index} className={`mb-1 ${
+                            theme === "light" ? "text-gray-600" : "text-base-content/80"
+                        }`} dangerouslySetInnerHTML={{ __html: text }} />
+                    );
+                }
+                const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                return (
+                    <p key={index} className={`mb-2 ${
+                        theme === "light" ? "text-gray-600" : "text-base-content/80"
+                    }`} dangerouslySetInnerHTML={{ __html: formattedLine }} />
+                );
+            })
+            .filter(Boolean);
     };
 
     const getNutrition = async () => {
@@ -76,30 +123,9 @@ const Nutrition = () => {
             const res = await axios.post(`${base_link}/api/food`, payload);
 
             if (res.status === 200) {
-                const [nutritionGrade, planString] = res.data.data as [string, string];
+                const [nutritionGrade, adviceString] = res.data.data as [string, string];
                 setGrade(nutritionGrade);
-
-                // Parse the plan string
-                const planObj = {} as WeeklyPlan;
-                let currentDay: string | null = null;
-
-                planString.split(/\r?\n/).forEach((raw) => {
-                    const line = raw.trim();
-                    const dayMatch = line.match(/^"(\w+)":\s*\[/);
-                    if (dayMatch) {
-                        currentDay = dayMatch[1];
-                        planObj[currentDay] = { breakfast: "", lunch: "", dinner: "" };
-                        return;
-                    }
-                    const mealMatch = line.match(/^"(\w+)":\s*"(.+?)"/);
-                    if (mealMatch && currentDay) {
-                        const [, mealType, mealDesc] = mealMatch;
-                        // @ts-ignore
-                        planObj[currentDay][mealType] = mealDesc;
-                    }
-                });
-                
-                setDietPlan(planObj);
+                setNutritionAdvice(adviceString);
                 toast.success("Nutrition analysis completed successfully!");
             } else {
                 toast.error("Failed to fetch nutrition data. Please try again.");
@@ -115,7 +141,7 @@ const Nutrition = () => {
     const resetForm = () => {
         setInputDiet("");
         setGrade(null);
-        setDietPlan(null);
+        setNutritionAdvice(null);
     };
 
     return (
@@ -236,7 +262,7 @@ const Nutrition = () => {
                                             </>
                                         )}
                                     </Button>
-                                    {(grade || dietPlan) && (
+                                    {(grade || nutritionAdvice) && (
                                         <Button
                                             variant="outline"
                                             onClick={resetForm}
@@ -288,7 +314,7 @@ const Nutrition = () => {
                         </motion.div>
                     )}
 
-                    {dietPlan && (
+                    {nutritionAdvice && (
                         <motion.div 
                             initial={{ opacity: 0, y: 20 }} 
                             animate={{ opacity: 1, y: 0 }} 
@@ -303,71 +329,66 @@ const Nutrition = () => {
                                     <CardTitle className={`flex items-center ${
                                         theme === "light" ? "text-gray-800" : ""
                                     }`}>
-                                        <Calendar className="w-6 h-6 mr-2 text-emerald-500" />
-                                        Weekly Diet Plan
+                                        <BookOpen className="w-6 h-6 mr-2 text-emerald-500" />
+                                        Personalized Nutrition Recommendations
                                     </CardTitle>
-                                <Alert className={`${
-                                                                theme === "light" 
-                                                                    ? "bg-green-50 border-green-200 border-l-4 green-l-green-500" 
-                                                                    : "bg-info/10 border-info/30 border-l-4 border-l-info"
-                                                            }`}>
-                                                                <AlertCircle className={`w-4 h-4 ${
-                                                                    theme === "light" ? "text-green-500" : "text-info"
-                                                                }`} />
-                                                                <AlertTitle className={`${
-                                                                    theme === "light" ? "text-emerald-700" : "text-info"
-                                                                } font-semibold`}>
-                                                                    Important Note
-                                                                </AlertTitle>
-                                                                <AlertDescription className={`${
-                                                                    theme === "light" ? "text-green-600" : "text-info"
-                                                                }`}>
-                                                                    This chart is prepared based on your weight, height, gender, and blood group.
-                                                                    Every detail is structured carefully to suit your nutritional profile.
-                                                                </AlertDescription>
-                                                            </Alert>
+                                    <Alert className={`mt-4 ${
+                                        theme === "light" 
+                                            ? "bg-green-50 border-green-200 border-l-4 border-l-green-500" 
+                                            : "bg-success/10 border-success/30 border-l-4 border-l-success"
+                                    }`}>
+                                        <AlertCircle className={`w-4 h-4 ${
+                                            theme === "light" ? "text-green-500" : "text-success"
+                                        }`} />
+                                        <AlertTitle className={`${
+                                            theme === "light" ? "text-emerald-700" : "text-success"
+                                        } font-semibold`}>
+                                            Personalized for You
+                                        </AlertTitle>
+                                        <AlertDescription className={`${
+                                            theme === "light" ? "text-green-600" : "text-success"
+                                        }`}>
+                                            This analysis is customized based on your weight, height, gender, and blood group.
+                                            Follow these recommendations for optimal nutrition.
+                                        </AlertDescription>
+                                    </Alert>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                                        {Object.entries(dietPlan).map(([day, meals], index) => (
+                                    <div className="space-y-6">
+                                        {parseNutritionAdvice(nutritionAdvice).map((section, index) => (
                                             <motion.div
-                                                key={day}
+                                                key={section?.id}
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: 0.4 + index * 0.1 }}
-                                                className={`p-4 rounded-lg border ${
+                                                className={`p-5 rounded-lg border ${
                                                     theme === "light" 
                                                         ? "bg-gray-50 border-gray-200 hover:bg-gray-100" 
                                                         : "bg-base-100/50 border-base-300 hover:bg-base-100/70"
                                                 } transition-colors duration-200`}
                                             >
-                                                <h5 className={`font-bold text-lg capitalize mb-3 ${
-                                                    theme === "light" ? "text-gray-800" : "text-base-content"
-                                                }`}>
-                                                    {day}
-                                                </h5>
-                                                <div className="space-y-3">
-                                                    {Object.entries(meals).map(([mealType, mealDesc]) => (
-                                                        <div key={mealType} className="flex items-start space-x-3">
-                                                            <div className={`p-2 rounded-full ${
-                                                                theme === "light" ? "bg-white shadow-sm" : "bg-base-200"
-                                                            }`}>
-                                                                {getMealIcon(mealType)}
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <h6 className={`font-semibold capitalize text-sm ${
-                                                                    theme === "light" ? "text-gray-700" : "text-base-content"
-                                                                }`}>
-                                                                    {mealType}
-                                                                </h6>
-                                                                <p className={`text-sm mt-1 ${
-                                                                    theme === "light" ? "text-gray-600" : "text-base-content/80"
-                                                                }`}>
-                                                                    {mealDesc}
-                                                                </p>
-                                                            </div>
+                                                <div className="flex items-center mb-3">
+                                                    <div className={`p-2 rounded-full mr-3 ${
+                                                        theme === "light" ? "bg-white shadow-sm" : "bg-base-200"
+                                                    }`}>
+                                                        {section?.icon}
+                                                    </div>
+                                                    <h5 className={`font-bold text-lg ${
+                                                        theme === "light" ? "text-gray-800" : "text-base-content"
+                                                    }`}>
+                                                        {section?.title}
+                                                    </h5>
+                                                </div>
+                                                <div className="ml-11">
+                                                    {section?.content.includes('- ') || section?.content.includes('•') ? (
+                                                        <ul className="space-y-1 list-disc list-inside">
+                                                            {formatContent(section?.content ?? "")}
+                                                        </ul>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {formatContent(section?.content ?? "")}
                                                         </div>
-                                                    ))}
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -412,7 +433,7 @@ const Nutrition = () => {
                                                 { step: "Processing food items", icon: "🍎", delay: 0 },
                                                 { step: "Calculating nutritional values", icon: "⚖️", delay: 1 },
                                                 { step: "Analyzing dietary patterns", icon: "📊", delay: 2 },
-                                                { step: "Generating personalized plan", icon: "📋", delay: 3 }
+                                                { step: "Generating personalized recommendations", icon: "📋", delay: 3 }
                                             ].map((item, index) => (
                                                 <motion.div
                                                     key={index}
@@ -438,34 +459,6 @@ const Nutrition = () => {
                                                 </motion.div>
                                             ))}
                                         </div>
-                                        
-                                        {/* Floating Elements */}
-                                        {/* <div className="relative h-20 overflow-hidden">
-                                            {["🥗", "🥑", "🍊", "🥕", "🫐", "🍇"].map((emoji, index) => (
-                                                <motion.div
-                                                    key={index}
-                                                    className="absolute text-2xl"
-                                                    initial={{ 
-                                                        x: -50, 
-                                                        y: Math.random() * 60,
-                                                        opacity: 0 
-                                                    }}
-                                                    animate={{ 
-                                                        x: 400, 
-                                                        y: Math.random() * 60,
-                                                        opacity: [0, 1, 1, 0] 
-                                                    }}
-                                                    transition={{
-                                                        duration: 4,
-                                                        delay: index * 0.5,
-                                                        repeat: Infinity,
-                                                        ease: "linear"
-                                                    }}
-                                                >
-                                                    {emoji}
-                                                </motion.div>
-                                            ))}
-                                        </div> */}
                                     </div>
                                 </CardContent>
                             </Card> 
@@ -571,7 +564,7 @@ const Nutrition = () => {
                                     <p className={`${
                                         theme === "light" ? "text-gray-600" : "text-base-content/70"
                                     }`}>
-                                        Enter your daily food intake to get personalized nutrition insights and a weekly meal plan.
+                                        Enter your daily food intake to get personalized nutrition insights and recommendations.
                                     </p>
                                 </CardContent>
                             </Card>
