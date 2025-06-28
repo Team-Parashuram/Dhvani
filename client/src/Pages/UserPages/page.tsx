@@ -14,8 +14,8 @@ import MyReports from "./_components/MyReports"
 import DiseaseChecker from "./_components/DiseaseChecker"
 import NeabyHospital from "./_components/NeabyHospital"
 import TBDetection from "./_components/TBDetection"
-import StrokeDetection from "./_components/StrokeDetection"
 import Nutrition from "./_components/Nutrition"
+import {Chatbot} from "@mishrashardendu22/chatbot-widget";
 
 interface IPatient {
     _id: string
@@ -33,7 +33,7 @@ interface IPatient {
 
 const UserPage = () => {
     const [patientInfo, setPatientInfo] = useState<IPatient | null>(null)
-    const [activeTab, setActiveTab] = useState<"availability" | "requests" | "find-hospital"| "chatbot" | "faq" | "profile" | "my-reports" | "disease-checker" | "tb-detection" | "stroke-detection" | "diet-planner">("disease-checker")
+    const [activeTab, setActiveTab] = useState<"availability" | "requests" | "find-hospital"| "chatbot" | "faq" | "profile" | "my-reports" | "disease-checker" | "tb-detection" | "diet-planner">("disease-checker")
     const [isCollapsed, setIsCollapsed] = useState(false)
     const { theme } = useThemeStore()
 
@@ -77,8 +77,6 @@ const UserPage = () => {
                 return <DiseaseChecker />
             case  "tb-detection": 
                 return <TBDetection />
-            case "stroke-detection":
-                return <StrokeDetection />
             case "find-hospital":
                 return <NeabyHospital />
             case "diet-planner": 
@@ -104,7 +102,7 @@ const UserPage = () => {
                 isCollapsed={isCollapsed}
                 setIsCollapsed={setIsCollapsed}
             />
-            
+            <Chatbot />
             <main className={`flex-1 pt-16 m-8 overflow-auto transition-all duration-200 ease-in-out
                 ${isCollapsed ? 'pl-20 lg:pl-[80px]' : 'pl-20 lg:pl-[280px]'}`}>
                 <motion.div 

@@ -2,7 +2,7 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import axiosInstance from "@/lib/axiosInstance";
+import axiosInstance from "@/util/axiosInstance";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, ChevronRight, ShieldAlert } from "lucide-react";
@@ -56,11 +56,11 @@ const ExclusionForm: React.FC<ExclusionFormProps> = ({
 
 
   return (
-    <Card className="border-2 border-primary/20 shadow-md">
+    <Card className="border-2 shadow-md border-primary/20 text-slate-800">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-primary" />
+            <ShieldAlert className="w-5 h-5 text-primary" />
             <CardTitle>Exclusion Criteria</CardTitle>
           </div>
           {allExclusionsEmpty && (
@@ -164,7 +164,7 @@ const ExclusionForm: React.FC<ExclusionFormProps> = ({
                 />
                 <Label
                   htmlFor={`anticoagulant-${key}`}
-                  className="text-base font-normal capitalize leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-base font-normal leading-none capitalize peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   {key.replace(/([A-Z])/g, " $1").trim()}
                 </Label>
@@ -180,7 +180,7 @@ const ExclusionForm: React.FC<ExclusionFormProps> = ({
           onClick={prevTab}
           className="flex items-center gap-1"
         >
-          <ChevronLeft className="h-4 w-4" /> Back
+          <ChevronLeft className="w-4 h-4" /> Back
         </Button>
         <Button
           onClick={() => {
@@ -189,7 +189,7 @@ const ExclusionForm: React.FC<ExclusionFormProps> = ({
           }}
           className="flex items-center gap-1 bg-primary"
         >
-          Next <ChevronRight className="h-4 w-4" />
+          Next <ChevronRight className="w-4 h-4" />
         </Button>
       </CardFooter>
     </Card>

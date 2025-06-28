@@ -96,7 +96,7 @@ const HeroSection = () => {
                             x: [-10, 10, -10],
                             y: [-10, 10, -10]
                         }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 10 }}
                     />
                 </div>
 
