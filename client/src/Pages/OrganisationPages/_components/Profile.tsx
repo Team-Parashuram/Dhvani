@@ -74,12 +74,6 @@ const Profile = () => {
         }
     }
 
-
-    const handleCancel = () => {
-        setEditData(orgData)
-        setIsEditing(false)
-    }
-
     if (loading && !orgData) {
         return (
             <motion.div 

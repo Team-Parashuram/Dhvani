@@ -28,7 +28,6 @@ import {
     const PatientManagement = () => {
     const [patients, setPatients] = useState<IPatient[]>([])
     const { theme } = useThemeStore()
-    const [patientToDelete, setPatientToDelete] = useState<string | null>(null)
 
     useEffect(() => {
         fetchPatients()
