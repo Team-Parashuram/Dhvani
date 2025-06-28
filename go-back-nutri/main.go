@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -17,7 +18,7 @@ import (
 )
 
 var OpenAI_KEY string
-var server_url = "https://nutrition-calculator-hvzj.onrender.com"
+var server_url = "https://nutrition-calculator-server.onrender.com"
 
 func main() {
 	if os.Getenv("ENVIRONMENT") == "DEVELOPMENT" {
@@ -47,7 +48,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000"
+		port = "3004"
 	}
 
 	log.Fatal(app.Listen(":" + port))
@@ -150,6 +151,9 @@ func food(c *fiber.Ctx) error {
 			ttCh <- result{"", err}
 			return
 		}
+		
+		fmt.Println("Timetable response:", tt)
+
 		ttStr, _ := tt.(string)
 		ttCh <- result{ttStr, nil}
 	}()

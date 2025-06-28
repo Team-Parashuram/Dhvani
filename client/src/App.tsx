@@ -18,8 +18,6 @@ import ChatBot from "./Pages/AI-Integration/ChatBot";
 import ProtectedUser from "./components/Routes/Protected/UserProtected";
 import LoginUser from "./Pages/UserPages/UserAuth/login";
 import RegisterUser from "./Pages/UserPages/UserAuth/register";
-import UserSurvey from "./Pages/UserPages/_components/UserSurvey";
-
 
 const App = () => {
   return (

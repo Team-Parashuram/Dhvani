@@ -46,17 +46,3 @@ type Choice struct {
 type LLMResponse struct {
 	Choices []Choice `json:"choices"`
 }
-
-type TimeTable struct {
-	Day []Day `json:"day"`
-}
-
-type Day struct {
-	Time []Meal `json:"time"`
-}
-
-type Meal struct {
-	Breakfast string `json:"breakfast"`
-	Lunch     string `json:"lunch"`
-	Dinner    string `json:"dinner"`
-}
