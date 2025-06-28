@@ -22,13 +22,15 @@ import {
     Ambulance, 
     Syringe
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
     iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
     shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
+
 type FacilityType = 'hospital' | 
 'clinic' | 'doctor' | 'dentist' | 
 'pharmacy' | 'laboratory' | 'emergency' | 
@@ -49,10 +51,12 @@ interface Coordinates {
     lat: number;
     lon: number;
 }
+
 const FACILITY_TYPES = [
     'all', 'hospital', 'clinic', 'doctor', 
     'dentist', 'pharmacy', 'laboratory', 'emergency', 'other'
 ] as const;
+
 const SEARCH_RADII = [2000, 5000, 10000] as const;
 const MAX_DISPLAYED_FACILITIES = 15;
 const GEOCODING_TIMEOUT = 15000;
@@ -61,22 +65,21 @@ const TTL = 24 * 60 * 60 * 1000;
 const GEOCODING_CACHE_KEY = 'healthcareGeocodingCache';
 const FACILITIES_CACHE_KEY = 'healthcareFacilitiesCache';
 
-
 function getGeocodingCache(address: string): Coordinates | null {
     try {
         const cache = JSON.parse(localStorage.getItem(GEOCODING_CACHE_KEY) || '{}');
         const entry = cache[address];
         if (entry && Date.now() - entry.timestamp < TTL) {
-        return entry.data;
+            return entry.data;
         }
         return null;
     } catch (error) {
         console.error('Error reading geocoding cache', error);
         return null;
     }
-    }
+}
 
-    function setGeocodingCache(address: string, data: Coordinates) {
+function setGeocodingCache(address: string, data: Coordinates) {
     try {
         const cache = JSON.parse(localStorage.getItem(GEOCODING_CACHE_KEY) || '{}');
         cache[address] = { data, timestamp: Date.now() };
@@ -84,23 +87,23 @@ function getGeocodingCache(address: string): Coordinates | null {
     } catch (error) {
         console.error('Error writing geocoding cache', error);
     }
-    }
+}
 
-    function getFacilitiesCache(cacheKey: string): Place[] | null {
+function getFacilitiesCache(cacheKey: string): Place[] | null {
     try {
         const cache = JSON.parse(localStorage.getItem(FACILITIES_CACHE_KEY) || '{}');
         const entry = cache[cacheKey];
         if (entry && Date.now() - entry.timestamp < TTL) {
-        return entry.data;
+            return entry.data;
         }
         return null;
     } catch (error) {
         console.error('Error reading facilities cache', error);
         return null;
     }
-    }
+}
 
-    function setFacilitiesCache(cacheKey: string, data: Place[]) {
+function setFacilitiesCache(cacheKey: string, data: Place[]) {
     try {
         const cache = JSON.parse(localStorage.getItem(FACILITIES_CACHE_KEY) || '{}');
         cache[cacheKey] = { data, timestamp: Date.now() };
@@ -124,7 +127,7 @@ function sanitizeAddress(input: string): string {
         .replace(/\s{2,}/g, ' ')
         .trim();
     
-    if (sanitized?.length < 3) {
+    if (sanitized.length < 3) {
         throw new Error('Address too short');
     }
     
@@ -148,9 +151,10 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
     if (!validateCoordinates(lat1, lon1) || !validateCoordinates(lat2, lon2)) {
         return Infinity;
     }
-        if (Math.abs(lat1) > 90 || Math.abs(lon1) > 180 ||Math.abs(lat2) > 90 || Math.abs(lon2) > 180){
+    
+    if (Math.abs(lat1) > 90 || Math.abs(lon1) > 180 || Math.abs(lat2) > 90 || Math.abs(lon2) > 180) {
         return Infinity;
-        }
+    }
     
     const toRad = (x: number) => (x * Math.PI) / 180;
     const R = 6371; 
@@ -186,6 +190,58 @@ class RateLimiter {
 
 const geocodingLimiter = new RateLimiter(1000);
 
+function extractKeyAddressComponents(address: string): string[] {
+    const variants: string[] = [];
+    variants.push(address);
+    
+    const postalCodeMatch = address.match(/\b\d{5,7}\b/);
+    if (postalCodeMatch) {
+        variants.push(postalCodeMatch[0]);
+    }
+    
+    const cityPostalMatch = address.match(/([\w\s]+?)\s*,\s*(\d{5,7})$/);
+    if (cityPostalMatch) {
+        variants.push(`${cityPostalMatch[1]}, ${cityPostalMatch[2]}`);
+    }
+    
+    const stateMatch = address.match(/,\s*([\w\s]+?)\s*,\s*[a-zA-Z]+$/i);
+    if (stateMatch) {
+        const cityMatch = address.match(/,\s*([\w\s]+?)\s*,\s*[\w\s]+,\s*[a-zA-Z]+$/i);
+        if (cityMatch) {
+            variants.push(`${cityMatch[1]}, ${stateMatch[1]}`);
+        }
+    }
+    
+    const withoutInstitution = address
+        .replace(/\b(university|college|institute|hospital|school|center|centre|clinic)\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+        
+    if (withoutInstitution && withoutInstitution !== address) {
+        variants.push(withoutInstitution);
+    }
+    
+    return [...new Set(variants)];
+}
+
+function createGeocodingQueries(address: string): string[] {
+    const baseUrls = [
+        `https://api.opencagedata.com/geocode/v1/json?key=e497daab13634b829932dcb43c73cd22&limit=1&q=`,
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=`
+    ];
+    
+    const queries: string[] = [];
+    const components = extractKeyAddressComponents(address);
+    
+    for (const component of components) {
+        for (const baseUrl of baseUrls) {
+            queries.push(`${baseUrl}${encodeURIComponent(component)}`);
+        }
+    }
+    
+    return queries;
+}
+
 export default function NearbyHospitalsMap({ address }: { address: string }) {
     const [places, setPlaces] = useState<Place[]>([]);
     const [coords, setCoords] = useState<Coordinates | null>(null);
@@ -197,97 +253,96 @@ export default function NearbyHospitalsMap({ address }: { address: string }) {
     const { theme } = useThemeStore();
 
     const getLatLngFromAddress = useCallback(async (addr: string): Promise<Coordinates> => {
-    const MAX_RETRIES = 3;
-    let lastError: any = null;
-    
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-        await geocodingLimiter.throttle();
-        const sanitizedAddress = sanitizeAddress(addr);
+        const MAX_RETRIES = 3;
+        let lastError: any = null;
         
-        const cachedCoords = getGeocodingCache(sanitizedAddress);
-        if (cachedCoords) {
-            return cachedCoords;
-        }
-
-        const query = encodeURIComponent(sanitizedAddress);
-
-        const urls = [
-            `https://api.opencagedata.com/geocode/v1/json?q=${query}&key=e497daab13634b829932dcb43c73cd22&limit=1`,
-            `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`
-        ];
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), GEOCODING_TIMEOUT);
-
         try {
-            for (const url of urls) {
+            const sanitizedAddress = sanitizeAddress(addr);
+            const cachedCoords = getGeocodingCache(sanitizedAddress);
+            if (cachedCoords) {
+                return cachedCoords;
+            }
+        } catch (e) {
+            console.log("Initial sanitization failed, proceeding with variants");
+        }
+        
+        const queries = createGeocodingQueries(addr);
+        
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                const response = await fetch(url, { 
-                signal: controller.signal,
-                headers: { 'User-Agent': 'HealthcareFacilityFinder/1.0' }
-                });
+                await geocodingLimiter.throttle();
+                const shuffledQueries = [...queries].sort(() => Math.random() - 0.5);
                 
-                if (!response.ok) continue;
-                
-                const data = await response.json();
-                const result = data.results?.[0] || data[0];
-                
-                if (!result) continue;
-                
-                const coords = {
-                lat: parseFloat(result.lat || result.latitude || result.geometry?.lat),
-                lon: parseFloat(result.lon || result.longitude || result.geometry?.lng)
-                };
-                
-                if (validateCoordinates(coords.lat, coords.lon)) {
-                clearTimeout(timeoutId);
-                setGeocodingCache(sanitizedAddress, coords);
-                return coords;
+                for (const url of shuffledQueries) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), GEOCODING_TIMEOUT);
+                        
+                        const response = await fetch(url, { 
+                            signal: controller.signal,
+                            headers: { 
+                                'User-Agent': 'HealthcareFacilityFinder/1.0',
+                                ...(url.includes('nominatim') ? { Referer: window.location.origin } : {})
+                            }
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) continue;
+                        
+                        const data = await response.json();
+                        const result = data.results?.[0] || data[0];
+                        if (!result) continue;
+                        
+                        const coords = {
+                            lat: parseFloat(result.lat || result.latitude || result.geometry?.lat),
+                            lon: parseFloat(result.lon || result.longitude || result.geometry?.lng)
+                        };
+                        
+                        if (validateCoordinates(coords.lat, coords.lon)) {
+                            const components = extractKeyAddressComponents(addr);
+                            components.forEach(comp => setGeocodingCache(comp, coords));
+                            return coords;
+                        }
+                    } catch (e) {
+                        // Continue to next query
+                    }
                 }
-            } catch (e) {
-                console.log('Error in coordinates');
+                throw new Error('All geocoding providers failed');
+            } catch (error) {
+                lastError = error;
+                await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
             }
-            }
-            throw new Error('All geocoding providers failed');
-        } finally {
-            clearTimeout(timeoutId);
         }
-        } catch (error) {
-        lastError = error;
-        await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+        
+        throw lastError || new Error('Geocoding failed after multiple attempts');
+    }, []);
+
+    const getNearbyPlaces = useCallback(async (lat: number, lon: number, searchRadius: number): Promise<Place[]> => {
+        const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${searchRadius}`;
+        const cachedPlaces = getFacilitiesCache(cacheKey);
+        if (cachedPlaces) {
+            return cachedPlaces;
         }
-    }
-    throw lastError || new Error('Geocoding failed after multiple attempts');
-}, []);
+        
+        const isValidCoord = (val: number) => !isNaN(val) && Math.abs(val) < 90;
+        
+        if (!isValidCoord(lat) || !isValidCoord(lon)) {
+            throw new Error(`Invalid coordinates: ${lat}, ${lon}`);
+        }
 
-
-const getNearbyPlaces = useCallback(async (lat: number, lon: number, searchRadius: number): Promise<Place[]> => {
-
-    const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${searchRadius}`;
-    const cachedPlaces = getFacilitiesCache(cacheKey);
-    if (cachedPlaces) {
-        return cachedPlaces;
-    }
-    const isValidCoord = (val: number) => !isNaN(val) && Math.abs(val) < 90;
-    
-    if (!isValidCoord(lat) || !isValidCoord(lon)) {
-        throw new Error(`Invalid coordinates: ${lat}, ${lon}`);
-    }
-
-
-const query = `
-    [out:json][timeout:25];
-    (
-        node["amenity"~"hospital|clinic|doctors|dentist|pharmacy|laboratory"](around:${searchRadius},${lat},${lon});
-        way["amenity"~"hospital|clinic|doctors|dentist|pharmacy|laboratory"](around:${searchRadius},${lat},${lon});
-        node["healthcare"](around:${searchRadius},${lat},${lon});
-        way["healthcare"](around:${searchRadius},${lat},${lon});
-        node["emergency"~"yes|ambulance_station"](around:${searchRadius},${lat},${lon});
-        way["emergency"~"yes|ambulance_station"](around:${searchRadius},${lat},${lon});
-    );
-    out center;
-`;
+        const query = `
+            [out:json][timeout:25];
+            (
+                node["amenity"~"hospital|clinic|doctors|dentist|pharmacy|laboratory"](around:${searchRadius},${lat},${lon});
+                way["amenity"~"hospital|clinic|doctors|dentist|pharmacy|laboratory"](around:${searchRadius},${lat},${lon});
+                node["healthcare"](around:${searchRadius},${lat},${lon});
+                way["healthcare"](around:${searchRadius},${lat},${lon});
+                node["emergency"~"yes|ambulance_station"](around:${searchRadius},${lat},${lon});
+                way["emergency"~"yes|ambulance_station"](around:${searchRadius},${lat},${lon});
+            );
+            out center;
+        `;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT);
@@ -310,7 +365,6 @@ const query = `
             }
 
             const data = await response.json();
-            console.log(`Overpass returned ${data.elements?.length} raw elements`);
             
             if (!data.elements || !Array.isArray(data.elements)) {
                 throw new Error('Invalid response format from Overpass API');
@@ -338,70 +392,70 @@ const query = `
                 elements: OverpassElement[];
             }
 
-const validPlaces = (data as OverpassResponse).elements
-.filter((element: OverpassElement) => {
-    const elementLat: number | undefined = element.lat ?? element.center?.lat;
-    const elementLon: number | undefined = element.lon ?? element.center?.lon;
-    
-    return (
-        typeof elementLat === 'number' &&
-        typeof elementLon === 'number' &&
-        validateCoordinates(elementLat, elementLon) &&
-        element.tags && 
-        (
-            element.tags.amenity || 
-            element.tags.healthcare || 
-            element.tags.emergency
-        )
-    );
-})
-    .map((element: OverpassElement): Place | null => {
-        try {
-            const coords = element.center || { lat: element.lat!, lon: element.lon! };
-            const distanceKm = haversine(lat, lon, coords.lat, coords.lon);
-            let facilityType: FacilityType = 'unknown';
-            const amenity = element.tags?.amenity;
-            const healthcare = element.tags?.healthcare;
-            const emergency = element.tags?.emergency;
+            const validPlaces = (data as OverpassResponse).elements
+                .filter((element: OverpassElement) => {
+                    const elementLat: number | undefined = element.lat ?? element.center?.lat;
+                    const elementLon: number | undefined = element.lon ?? element.center?.lon;
+                    
+                    return (
+                        typeof elementLat === 'number' &&
+                        typeof elementLon === 'number' &&
+                        validateCoordinates(elementLat, elementLon) &&
+                        element.tags && 
+                        (
+                            element.tags.amenity || 
+                            element.tags.healthcare || 
+                            element.tags.emergency
+                        )
+                    );
+                })
+                .map((element: OverpassElement): Place | null => {
+                    try {
+                        const coords = element.center || { lat: element.lat!, lon: element.lon! };
+                        const distanceKm = haversine(lat, lon, coords.lat, coords.lon);
+                        let facilityType: FacilityType = 'unknown';
+                        const amenity = element.tags?.amenity;
+                        const healthcare = element.tags?.healthcare;
+                        const emergency = element.tags?.emergency;
+                        
+                        if (emergency === 'yes' || emergency === 'ambulance_station') {
+                            facilityType = 'emergency';
+                        } else if (amenity === 'hospital' || healthcare === 'hospital') {
+                            facilityType = 'hospital';
+                        } else if (amenity === 'clinic' || healthcare === 'clinic') {
+                            facilityType = 'clinic';
+                        } else if (amenity === 'doctors' || amenity === 'doctor' || healthcare === 'doctor' || healthcare === 'physician') {
+                            facilityType = 'doctor';
+                        } else if (amenity === 'dentist' || healthcare === 'dentist') {
+                            facilityType = 'dentist';
+                        } else if (amenity === 'pharmacy' || healthcare === 'pharmacy') {
+                            facilityType = 'pharmacy';
+                        } else if (amenity === 'laboratory' || healthcare === 'laboratory') {
+                            facilityType = 'laboratory';
+                        } else if (healthcare) {
+                            facilityType = 'other';
+                        } else {
+                            facilityType = 'unknown';
+                        }
+                        
+                        return {
+                            id: `${element.type}-${element.id}`,
+                            name: element.tags?.name || `Healthcare Facility`,
+                            lat: coords.lat,
+                            lon: coords.lon,
+                            type: facilityType,
+                            distanceKm: parseFloat(distanceKm.toFixed(2)),
+                            phone: element.tags?.phone,
+                            website: element.tags?.website
+                        };
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((place): place is Place => place !== null);
             
-            
-        if (emergency === 'yes' || emergency === 'ambulance_station') {
-            facilityType = 'emergency';
-        } else if (amenity === 'hospital' || healthcare === 'hospital') {
-            facilityType = 'hospital';
-        } else if (amenity === 'clinic' || healthcare === 'clinic') {
-            facilityType = 'clinic';
-        } else if (amenity === 'doctors' || amenity === 'doctor' || healthcare === 'doctor' || healthcare === 'physician') {
-            facilityType = 'doctor';
-        } else if (amenity === 'dentist' || healthcare === 'dentist') {
-            facilityType = 'dentist';
-        } else if (amenity === 'pharmacy' || healthcare === 'pharmacy') {
-            facilityType = 'pharmacy';
-        } else if (amenity === 'laboratory' || healthcare === 'laboratory') {
-            facilityType = 'laboratory';
-        } else if (healthcare) {
-            facilityType = 'other';
-        } else {
-            facilityType = 'unknown';
-        }
-            
-            return {
-                id: `${element.type}-${element.id}`,
-                name: element.tags?.name || `Healthcare Facility`,
-                lat: coords.lat,
-                lon: coords.lon,
-                type: facilityType,
-                distanceKm: parseFloat(distanceKm.toFixed(2)),
-                phone: element.tags?.phone,
-                website: element.tags?.website
-            };
-        } catch {
-            return null;
-        }
-    })
-    .filter((place): place is Place => place !== null);
-        setFacilitiesCache(cacheKey, validPlaces);
-        return validPlaces.sort((a, b) => a.distanceKm - b.distanceKm);
+            setFacilitiesCache(cacheKey, validPlaces);
+            return validPlaces.sort((a, b) => a.distanceKm - b.distanceKm);
         } catch (error) {
             clearTimeout(timeoutId);
             
@@ -427,13 +481,13 @@ const validPlaces = (data as OverpassResponse).elements
             const facilitiesCacheKey = `${location.lat.toFixed(4)}_${location.lon.toFixed(4)}_${radius}`;
             const cachedFacilities = getFacilitiesCache(facilitiesCacheKey);
 
-        if(cachedFacilities) {
-            setPlaces(cachedFacilities);
-            setRetryCount(0);
+            if (cachedFacilities) {
+                setPlaces(cachedFacilities);
+                setRetryCount(0);
             } else {
-            const facilities = await getNearbyPlaces(location.lat, location.lon, radius);
-            setPlaces(facilities);
-            setRetryCount(0);
+                const facilities = await getNearbyPlaces(location.lat, location.lon, radius);
+                setPlaces(facilities);
+                setRetryCount(0);
             }
         } catch (error) {
             console.error("Failed to load healthcare facilities:", error);
@@ -464,42 +518,42 @@ const validPlaces = (data as OverpassResponse).elements
             setError(null);
         }
     }, [address, radius, loadData]);
+
     const filteredPlaces = useMemo(() => {
         return filter === 'all' 
             ? places 
             : places.filter(place => place.type === filter);
     }, [places, filter]);
     
-const getTypeIcon = useCallback((type: string) => {
-    const iconMap = {
-        hospital: <Hospital className="w-4 h-4" />,
-        clinic: <Stethoscope className="w-4 h-4" />,
-        doctor: <UserCheck className="w-4 h-4" />,
-        dentist: <BriefcaseMedical className="w-4 h-4" />,
-        pharmacy: <Pill className="w-4 h-4" />,
-        laboratory: <Syringe className="w-4 h-4" />,
-        emergency: <Ambulance className="w-4 h-4" />,
-        other: <MapPin className="w-4 h-4" />,
-        default: <MapPin className="w-4 h-4" />
-    };
-    return iconMap[type as keyof typeof iconMap] || iconMap.default;
-}, []);
-
-
+    const getTypeIcon = useCallback((type: string) => {
+        const iconMap = {
+            hospital: <Hospital className="w-4 h-4" />,
+            clinic: <Stethoscope className="w-4 h-4" />,
+            doctor: <UserCheck className="w-4 h-4" />,
+            dentist: <BriefcaseMedical className="w-4 h-4" />,
+            pharmacy: <Pill className="w-4 h-4" />,
+            laboratory: <Syringe className="w-4 h-4" />,
+            emergency: <Ambulance className="w-4 h-4" />,
+            other: <MapPin className="w-4 h-4" />,
+            default: <MapPin className="w-4 h-4" />
+        };
+        return iconMap[type as keyof typeof iconMap] || iconMap.default;
+    }, []);
+    
     const getTypeColor = useCallback((type: string) => {
-    const colorMap = {
-        hospital: theme === "light" ? "bg-red-100 text-red-800" : "bg-error/20 text-error",
-        clinic: theme === "light" ? "bg-blue-100 text-blue-800" : "bg-info/20 text-info",
-        doctor: theme === "light" ? "bg-green-100 text-green-800" : "bg-success/20 text-success",
-        dentist: theme === "light" ? "bg-purple-100 text-purple-800" : "bg-purple-500/20 text-purple-300",
-        pharmacy: theme === "light" ? "bg-amber-100 text-amber-800" : "bg-amber-500/20 text-amber-300",
-        laboratory: theme === "light" ? "bg-cyan-100 text-cyan-800" : "bg-cyan-500/20 text-cyan-300",
-        emergency: theme === "light" ? "bg-orange-100 text-orange-800" : "bg-orange-500/20 text-orange-300",
-        other: theme === "light" ? "bg-gray-100 text-gray-800" : "bg-base-300 text-base-content",
-        unknown: theme === "light" ? "bg-gray-100 text-gray-800" : "bg-base-300 text-base-content",
-    };
-    return colorMap[type as keyof typeof colorMap] || colorMap.unknown;
-}, [theme]);
+        const colorMap = {
+            hospital: theme === "light" ? "bg-red-100 text-red-800" : "bg-error/20 text-error",
+            clinic: theme === "light" ? "bg-blue-100 text-blue-800" : "bg-info/20 text-info",
+            doctor: theme === "light" ? "bg-green-100 text-green-800" : "bg-success/20 text-success",
+            dentist: theme === "light" ? "bg-purple-100 text-purple-800" : "bg-purple-500/20 text-purple-300",
+            pharmacy: theme === "light" ? "bg-amber-100 text-amber-800" : "bg-amber-500/20 text-amber-300",
+            laboratory: theme === "light" ? "bg-cyan-100 text-cyan-800" : "bg-cyan-500/20 text-cyan-300",
+            emergency: theme === "light" ? "bg-orange-100 text-orange-800" : "bg-orange-500/20 text-orange-300",
+            other: theme === "light" ? "bg-gray-100 text-gray-800" : "bg-base-300 text-base-content",
+            unknown: theme === "light" ? "bg-gray-100 text-gray-800" : "bg-base-300 text-base-content",
+        };
+        return colorMap[type as keyof typeof colorMap] || colorMap.unknown;
+    }, [theme]);
 
     const getDistanceColor = useCallback((distance: number) => {
         if (distance <= 1) return theme === "light" ? "bg-green-100 text-green-800" : "bg-success/20 text-success";
@@ -542,32 +596,48 @@ const getTypeIcon = useCallback((type: string) => {
         );
     }
 
-
     if (error) {
         return (
-            <Alert className={`border-l-4 ${
-                theme === "light" 
-                    ? "border-l-red-500 bg-red-50 border-red-200" 
-                    : "border-l-error bg-error/10 border-error/30"
-            }`}>
-                <AlertCircle className={`w-4 h-4 ${
-                    theme === "light" ? "text-red-500" : "text-error"
-                }`} />
-                <AlertDescription className={`${
-                    theme === "light" ? "text-red-600" : "text-error"
-                } flex items-center justify-between`}>
-                    <span>{error}</span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={loadData}
-                        className="ml-4"
-                    >
-                        <RefreshCw className="w-4 h-4 mr-1" />
-                        Retry
-                    </Button>
-                </AlertDescription>
-            </Alert>
+            <div className="space-y-4">
+                <Alert variant="destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    <AlertTitle>Location Resolution Failed</AlertTitle>
+                    <AlertDescription>
+                        <div className="grid gap-2">
+                            <p>We couldn't process: <strong>{address}</strong></p>
+                            
+                            <div className="mt-3">
+                                <h4 className="mb-1 font-medium">Try these solutions:</h4>
+                                <ul className="pl-5 space-y-1 list-disc">
+                                    <li>Use a simpler format: <em>City, Postal Code</em></li>
+                                    <li>Ensure postal code is included (6 digits for India)</li>
+                                    <li>Separate address components with commas</li>
+                                    <li>Include both city and state names</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Retry Options</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-3">
+                        <Button onClick={loadData} variant="secondary">
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Retry with Simplified Address
+                        </Button>
+                        
+                        <Button variant="outline" asChild>
+                            <a href="/profile">
+                                <UserCheck className="w-4 h-4 mr-2" />
+                                Update Profile Address
+                            </a>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 
@@ -868,12 +938,12 @@ const getTypeIcon = useCallback((type: string) => {
                                     </div>
                                 </motion.div>
                             ))}
-                            {filteredPlaces?.length > MAX_DISPLAYED_FACILITIES && (
+                            {filteredPlaces.length > MAX_DISPLAYED_FACILITIES && (
                                 <div className={`text-center py-4 ${
                                     theme === "light" ? "text-gray-600" : "text-base-content/70"
                                 }`}>
                                     <p className="text-sm">
-                                        Showing top {MAX_DISPLAYED_FACILITIES} results. {filteredPlaces?.length - MAX_DISPLAYED_FACILITIES} more facilities available.
+                                        Showing top {MAX_DISPLAYED_FACILITIES} results. {filteredPlaces.length - MAX_DISPLAYED_FACILITIES} more facilities available.
                                     </p>
                                 </div>
                             )}
