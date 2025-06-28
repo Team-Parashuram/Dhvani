@@ -1,0 +1,12 @@
+# requirements.txt
+
+flask
+torch
+torchvision
+numpy
+Pillow
+huggingface_hub
+timm
+opencv-python
+matplotlib
+grad-cam
