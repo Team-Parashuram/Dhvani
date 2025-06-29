@@ -14,8 +14,9 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-# Import the model builder from the MedSAM library
-from segment_anything_2_medsam.build_sam import build_medsam2
+import sys
+sys.path.append('../MedSAM') 
+from segment_anything import sam_model_registry
 from setup_models import download_models, MODEL_FILES, CHECKPOINTS_DIR
 
 # --- Configuration ---
@@ -64,29 +65,40 @@ def load_all_models():
     print("--- Loading Models ---")
     print(f"Using device: {DEVICE}")
     
-    # Load MedSAM models
     for model_file in MODEL_FILES:
         model_path = os.path.join(CHECKPOINTS_DIR, model_file)
         if not os.path.exists(model_path):
             print(f"Warning: Model file not found at {model_path}. Skipping.")
             continue
-        
+
         print(f"Loading {model_file}...")
         try:
-            model = build_medsam2(model_path, is_lite=True) 
-            model.to(DEVICE)
-            model.eval()
-            MODELS[model_file] = model
+            # 1) Load the checkpoint onto the correct device
+            ckpt = torch.load(model_path, map_location=DEVICE)
+            # 2) Unwrap if it's nested under a "model" key
+            state_dict = ckpt.get("model", ckpt)
+
+            # 3) Choose the SAM variant matching your checkpoint (e.g. "vit_h", "vit_l", etc.)
+            sam_variant = "vit_h"
+            # instantiate architecture without loading
+            sam = sam_model_registry[sam_variant](checkpoint=None)
+
+            # 4) Load our unwrapped weights (strict=False tolerates minor mismatches)
+            sam.load_state_dict(state_dict, strict=False)
+
+            # 5) Move to device, set eval mode, and store
+            sam.to(DEVICE)
+            sam.eval()
+            MODELS[model_file] = sam
+
             print(f"Successfully loaded {model_file}.")
         except Exception as e:
             print(f"Failed to load {model_file}. Error: {e}")
-    
-    # Load ViT model
+
+    # finally, load the ViT model as before
     load_vit_model()
-    
     print("--- All available models loaded. ---")
 
-@torch.no_grad()
 def analyze_with_vit(image_pil):
     """
     Performs TB detection using ViT model and generates Grad-CAM heatmap.
