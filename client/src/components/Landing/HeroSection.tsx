@@ -39,7 +39,7 @@ const HeroSection = () => {
         const newCount = crossClickCount + 1;
         setCrossClickCount(newCount);
         
-        if (newCount >= 15) {
+        if (newCount >= 5) {
             navigate('/admin/login');
         }
     };
@@ -100,38 +100,6 @@ const HeroSection = () => {
                     />
                 </div>
 
-                {/* Floating Red Cross for Admin Access */}
-                <motion.button
-                    onClick={handleCrossClick}
-                    className={`absolute md:top-1/3 md:right-[35%] z-20 w-15 h-15 md:w-24 md:h-24 ${
-                        theme === "light" ? "text-red-500/30" : "text-red-400/30"
-                    } hover:${theme === "light" ? "text-red-500/50" : "text-red-400/50"} transition-colors cursor-pointer`}
-                    whileHover={{ scale: 1.2, rotate: 90 }}
-                    whileTap={{ scale: 0.8 }}
-                    transition={{ 
-                        scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
-                        opacity: { duration: 3, repeat: Infinity, ease: "easeInOut" },
-                        rotate: { duration: 12, repeat: Infinity, ease: "linear" }
-                    }}
-                >
-                    <div className={`relative w-full h-full rounded-lg shadow-lg ${
-                        theme === "light" 
-                            ? "bg-gradient-to-br from-red-400 to-red-600" 
-                            : "bg-gradient-to-br from-primary to-primary/80"
-                    }`}>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className={`w-3/4 h-1/5 rounded-sm ${
-                                theme === "light" ? "bg-white/90" : "bg-white/80"
-                            }`}></div>
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className={`w-1/5 h-3/4 rounded-sm ${
-                                theme === "light" ? "bg-white/90" : "bg-white/80"
-                            }`}></div>
-                        </div>
-                    </div>
-                </motion.button>
-
                 <div className="absolute inset-0 overflow-hidden">
                     {Array.from({length: 25}).map((_, i) => (
                         <motion.div
@@ -173,7 +141,6 @@ const HeroSection = () => {
                 variants={containerVariants}
             >
                 <div className="max-w-6xl mx-auto mt-10 text-center">
-                    {/* Heartbeat Animation */}
                     <svg 
                         height="200" 
                         viewBox="0 0 540 100"
@@ -206,20 +173,57 @@ const HeroSection = () => {
                         }
                     `}</style>
 
-                    {/* Main Title */}
-                    <motion.div variants={itemVariants} className="mb-6">
-                        <h1 className={`text-6xl md:text-7xl font-bold leading-tight mb-4 ${
-                            theme === "light" 
-                                ? "bg-gradient-to-r from-gray-900 via-red-600 to-gray-900 bg-clip-text text-transparent"
-                                : "bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent"
-                        }`}>
-                            Dhvani
-                        </h1>
+
+                    <motion.div variants={itemVariants} className="relative mb-6">
+                        <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8">
+                            <h1 className={`text-5xl sm:text-6xl md:text-7xl font-bold leading-tight ${
+                                theme === "light" 
+                                    ? "bg-gradient-to-r from-gray-900 via-red-600 to-gray-900 bg-clip-text text-transparent"
+                                    : "bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent"
+                            }`}>
+                                Dhvani
+                            </h1>
+                            
+                            <motion.button
+                                onClick={handleCrossClick}
+                                className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 ${
+                                    theme === "light" ? "text-red-600" : "text-red-600"
+                                } hover:${theme === "light" ? "text-red-600" : "text-red-600"}  cursor-pointer`}
+                                // whileHover={{ scale: 1.1 }}
+                                // whileTap={{ scale: 0.95 }}
+                                animate={{ 
+                                    scale: [1, 1.05, 1],
+                                    // opacity: [0.5, 0.8, 0.5]
+                                }}
+                                transition={{ 
+                                    scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+                                    opacity: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+                                }}
+                            >
+                                <div className={`relative w-full h-full rounded-lg shadow-lg ${
+                                    theme === "light" 
+                                        ? "bg-red-600" 
+                                        : "bg-gradient-to-br from-primary to-primary/80"
+                                }`}>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className={`w-3/4 h-1/5 rounded-sm ${
+                                            theme === "light" ? "bg-white/90" : "bg-white/80"
+                                        }`}></div>
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className={`w-1/5 h-3/4 rounded-sm ${
+                                            theme === "light" ? "bg-white/90" : "bg-white/80"
+                                        }`}></div>
+                                    </div>
+                                </div>
+                            </motion.button>
+                        </div>
+                        
                         <motion.div 
-                            className="relative inline-block"
+                            className="relative inline-block mt-4"
                             whileHover={{ scale: 1.02 }}
                         >
-                            <h2 className={`text-2xl md:text-3xl font-semibold mb-2 ${
+                            <h2 className={`text-xl sm:text-2xl md:text-3xl font-semibold mb-2 ${
                                 theme === "light" ? "text-gray-700" : "text-slate-300"
                             }`}>
                                 Your Comprehensive Healthcare Companion
@@ -232,14 +236,13 @@ const HeroSection = () => {
                         </motion.div>
                     </motion.div>
 
-
                     <motion.div variants={itemVariants} className="mb-6">
-                        <p className={`text-2xl md:text-3xl font-medium mb-2 ${
+                        <p className={`text-xl sm:text-2xl md:text-3xl font-medium mb-2 ${
                             theme === "light" ? "text-red-600" : "text-primary"
                         }`}>
                             ख़्याल ही असली इलाज है
                         </p>
-                        <p className={`text-lg italic ${
+                        <p className={`text-base sm:text-lg italic ${
                             theme === "light" ? "text-gray-600" : "text-slate-400"
                         }`}>
                             "Care is the real cure"
@@ -278,6 +281,7 @@ const HeroSection = () => {
                             </motion.div>
                         ))}
                     </motion.div>
+                    
                     {/* CTA Buttons */}
                     <motion.div 
                         variants={itemVariants}

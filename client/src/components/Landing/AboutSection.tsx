@@ -90,11 +90,11 @@ const AboutSection = () => {
 
                 <div className="flex flex-wrap gap-6 mb-8">
                     <div className="flex items-center">
-                    <Users className={`w-6 h-6 mr-3 ${theme === "light" ? "text-red-500" : "text-primary"}`} />
-                    <div>
+                    {/* <Users className={`w-6 h-6 mr-3 ${theme === "light" ? "text-red-500" : "text-primary"}`} /> */}
+                    {/* <div>
                         <p className={`font-semibold ${theme === "light" ? "text-gray-900" : "text-white"}`}>50,000+</p>
                         <p className={`text-sm ${theme === "light" ? "text-gray-600" : "text-slate-400"}`}>Happy Users</p>
-                    </div>
+                    </div> */}
                     </div>
                     <div className="flex items-center">
                     <Globe className={`w-6 h-6 mr-3 ${theme === "light" ? "text-blue-500" : "text-info"}`} />
