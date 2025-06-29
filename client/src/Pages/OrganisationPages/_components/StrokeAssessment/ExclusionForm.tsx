@@ -2,7 +2,6 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import axiosInstance from "@/util/axiosInstance";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, ChevronRight, ShieldAlert } from "lucide-react";
@@ -42,9 +41,6 @@ const ExclusionForm: React.FC<ExclusionFormProps> = ({
   
   const handleSubmit = async () => {
     try {
-      await axiosInstance.post("/patient/register", {
-        ...patientDetails,
-      });
       setPatientDetails(patientDetails);
       toast.success("Patient registered successfully");
     } catch (error) {
