@@ -1,10 +1,10 @@
 import requests
 
 # Upload and analyze an image
-files = {'image': open('medical_image.jpg', 'rb')}
-data = {'model_type': 'liver_mri'}
+files = {'image': open('/home/mayank/Downloads/ct_lesion-negative.png', 'rb')}
+data = {'model_type': 'ct_lesion'}
 
-response = requests.post('http://localhost:5000/analyze', files=files, data=data)
+response = requests.post('http://localhost:5100/analyze', files=files, data=data)
 result = response.json()
 
 if result.get('success'):
