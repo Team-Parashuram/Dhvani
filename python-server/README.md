@@ -6,6 +6,7 @@ conda activate medsam2
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 
 ## Install other dependencies
+pip install git+https://github.com/facebookresearch/segment-anything.git
 pip install -r requirements.txt
 
 ## Download models
