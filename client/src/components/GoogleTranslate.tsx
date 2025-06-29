@@ -26,7 +26,8 @@ interface LanguageOption {
         { code: 'es', name: 'Español', flag: '🇪🇸' },
         { code: 'fr', name: 'Français', flag: '🇫🇷' },
         { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-        { code: 'zh-CN', name: '中文', flag: '🇨🇳' }
+        { code: 'zh-CN', name: '中文', flag: '🇨🇳' },
+        { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
     ];
 
     useEffect(() => {
