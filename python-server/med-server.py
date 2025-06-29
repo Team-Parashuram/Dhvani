@@ -1,438 +1,329 @@
-from flask import Flask, request, jsonify, render_template_string
-from werkzeug.utils import secure_filename
+# app.py
+
 import os
-import torch
-import numpy as np
-from PIL import Image
 import io
 import base64
-import json
-from datetime import datetime
-import traceback
+import torch
+import timm
+import numpy as np
+import cv2
+from PIL import Image
+from flask import Flask, request, render_template, send_file, jsonify
+from torchvision import transforms
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-# Import MedSAM2 dependencies
-try:
-    import torch
-    import torch.nn as nn
-    from torchvision import transforms
-    from segment_anything import sam_model_registry, SamPredictor
-    print("✅ Core dependencies loaded successfully")
-    SAM_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Error importing dependencies: {e}")
-    print("Please install: pip install torch torchvision segment-anything")
-    SAM_AVAILABLE = False
+# Import the model builder from the MedSAM library
+from segment_anything_2_medsam.build_sam import build_medsam2
+from setup_models import download_models, MODEL_FILES, CHECKPOINTS_DIR
 
+# --- Configuration ---
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 
-# Configuration
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['RESULTS_FOLDER'] = 'results'
+# --- Model Loading ---
+# This dictionary will hold our loaded models
+MODELS = {}
+VIT_MODEL = None
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Ensure directories exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
-os.makedirs('checkpoints', exist_ok=True)
+# ViT Configuration
+VIT_MODEL_NAME = "vit_base_patch16_224.augreg2_in21k_ft_in1k"
+VIT_MODEL_PATH = "checkpoints/vit_model.pth"
+VIT_LABEL_MAP = {0: "Normal", 1: "TB Detected"}
 
-# Allowed file extensions
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'dcm'}
+# ViT preprocessing transform
+vit_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+])
 
-# Model configurations
-MODEL_CONFIGS = {
-    'general': {
-        'file': 'MedSAM2_latest.pt',
-        'description': 'General medical image segmentation'
-    },
-    'heart_us': {
-        'file': 'MedSAM2_US_Heart.pt',
-        'description': 'Ultrasound heart segmentation'
-    },
-    'liver_mri': {
-        'file': 'MedSAM2_MRI_LiverLesion.pt',
-        'description': 'MRI liver lesion detection'
-    },
-    'ct_lesion': {
-        'file': 'MedSAM2_CTLesion.pt',
-        'description': 'CT lesion detection'
-    },
-    'foundation': {
-        'file': 'MedSAM2_2411.pt',
-        'description': 'Foundation model for medical imaging'
+def load_vit_model():
+    """Loads the ViT model for TB detection."""
+    global VIT_MODEL
+    print("--- Loading ViT Model ---")
+    
+    if not os.path.exists(VIT_MODEL_PATH):
+        print(f"Warning: ViT model file not found at {VIT_MODEL_PATH}. ViT features will be disabled.")
+        return
+    
+    try:
+        model = timm.create_model(VIT_MODEL_NAME, pretrained=False, num_classes=2)
+        model.load_state_dict(torch.load(VIT_MODEL_PATH, map_location=DEVICE))
+        model.to(DEVICE)
+        model.eval()
+        VIT_MODEL = model
+        print("Successfully loaded ViT model for TB detection.")
+    except Exception as e:
+        print(f"Failed to load ViT model. Error: {e}")
+
+def load_all_models():
+    """Loads all specified models into memory."""
+    print("--- Loading Models ---")
+    print(f"Using device: {DEVICE}")
+    
+    # Load MedSAM models
+    for model_file in MODEL_FILES:
+        model_path = os.path.join(CHECKPOINTS_DIR, model_file)
+        if not os.path.exists(model_path):
+            print(f"Warning: Model file not found at {model_path}. Skipping.")
+            continue
+        
+        print(f"Loading {model_file}...")
+        try:
+            model = build_medsam2(model_path, is_lite=True) 
+            model.to(DEVICE)
+            model.eval()
+            MODELS[model_file] = model
+            print(f"Successfully loaded {model_file}.")
+        except Exception as e:
+            print(f"Failed to load {model_file}. Error: {e}")
+    
+    # Load ViT model
+    load_vit_model()
+    
+    print("--- All available models loaded. ---")
+
+@torch.no_grad()
+def analyze_with_vit(image_pil):
+    """
+    Performs TB detection using ViT model and generates Grad-CAM heatmap.
+    Returns prediction results and heatmap overlay image.
+    """
+    if VIT_MODEL is None:
+        raise ValueError("ViT model is not loaded.")
+    
+    # Preprocess image
+    input_tensor = vit_transform(image_pil).unsqueeze(0).to(DEVICE)
+    
+    # Prediction
+    output = VIT_MODEL(input_tensor)
+    probs = torch.softmax(output, dim=1)[0]
+    pred_class = torch.argmax(probs).item()
+    
+    # Generate Grad-CAM heatmap
+    target_layer = VIT_MODEL.patch_embed.proj
+    cam = GradCAM(model=VIT_MODEL, target_layers=[target_layer])
+    targets = [ClassifierOutputTarget(pred_class)]
+    grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0]
+    
+    # Create overlay
+    original_image = np.array(image_pil.resize((224, 224))) / 255.0
+    cam_image = show_cam_on_image(original_image, grayscale_cam, use_rgb=True)
+    cam_image_pil = Image.fromarray(cam_image)
+    
+    # Prepare results
+    results = {
+        'prediction': VIT_LABEL_MAP[pred_class],
+        'confidence': {
+            'tb_detected': float(probs[1]),
+            'normal': float(probs[0])
+        },
+        'predicted_class': pred_class
     }
-}
+    
+    return results, cam_image_pil
 
-# Global model storage
-loaded_models = {}
+@torch.no_grad()
+def segment_image(image_pil, model_name):
+    """
+    Performs segmentation on a PIL image using the specified model.
+    Returns a PIL image with the segmentation mask overlaid.
+    """
+    if model_name not in MODELS:
+        raise ValueError(f"Model '{model_name}' is not loaded.")
 
-def allowed_file(filename):
-    """Check if file extension is allowed"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    model = MODELS[model_name]
+    
+    # Pre-processing: convert to RGB, resize, and convert to tensor
+    image_np = np.array(image_pil.convert("RGB"))
+    H, W, _ = image_np.shape
+    
+    # The MedSAM model expects a specific input format
+    input_image = torch.from_numpy(image_np).permute(2, 0, 1).unsqueeze(0).to(DEVICE)
+    # Normalize if needed
+    input_image = (input_image - input_image.mean()) / input_image.std()
 
-def load_model(model_type):
-    """Load a specific MedSAM2 model"""
-    if model_type not in MODEL_CONFIGS:
-        raise ValueError(f"Unknown model type: {model_type}")
+    # Model inference
+    masks, _, _ = model(input_image)
+    masks = masks.squeeze(0).cpu().numpy()
     
-    if model_type in loaded_models:
-        return loaded_models[model_type]
+    # Combine all masks into a single boolean mask for visualization
+    final_mask = np.any(masks > 0, axis=0)
     
-    model_path = os.path.join('checkpoints', MODEL_CONFIGS[model_type]['file'])
+    # Create overlay
+    overlay_image = image_pil.copy()
+    overlay_color = np.array([0, 255, 0, 150]) # Green with transparency
     
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model file not found: {model_path}. Please ensure you've downloaded the models using the provided script.")
+    # Apply overlay where the mask is true
+    overlay_rgba = np.zeros((H, W, 4), dtype=np.uint8)
+    overlay_rgba[final_mask] = overlay_color
     
-    if not SAM_AVAILABLE:
-        raise ImportError("Required dependencies not installed. Please run: pip install torch torchvision segment-anything")
+    mask_pil = Image.fromarray(overlay_rgba, 'RGBA')
+    overlay_image.paste(mask_pil, (0, 0), mask_pil)
     
-    try:
-        # Load the MedSAM2 model checkpoint
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"Loading {model_type} model on {device}...")
-        
-        # Load model checkpoint
-        checkpoint = torch.load(model_path, map_location=device)
-        
-        # Initialize SAM predictor with MedSAM2 weights
-        # Note: MedSAM2 is based on SAM architecture
-        sam_model = sam_model_registry["vit_b"](checkpoint=None)  # We'll load custom weights
-        
-        # Load the MedSAM2 weights into the SAM model
-        if 'model' in checkpoint:
-            sam_model.load_state_dict(checkpoint['model'], strict=False)
-        else:
-            sam_model.load_state_dict(checkpoint, strict=False)
-        
-        sam_model.to(device)
-        sam_model.eval()
-        
-        # Create predictor
-        predictor = SamPredictor(sam_model)
-        
-        loaded_models[model_type] = {
-            'predictor': predictor,
-            'device': device,
-            'model': sam_model
-        }
-        
-        print(f"✅ Successfully loaded {model_type} model")
-        return loaded_models[model_type]
-        
-    except Exception as e:
-        error_msg = f"Failed to load model {model_type}: {str(e)}"
-        print(f"❌ {error_msg}")
-        raise RuntimeError(error_msg)
+    return overlay_image
 
-def preprocess_image(image_path):
-    """Preprocess image for MedSAM2"""
-    try:
-        # Load image
-        image = Image.open(image_path)
-        
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Convert to numpy array
-        image_array = np.array(image)
-        
-        return image_array, image
-    except Exception as e:
-        raise RuntimeError(f"Failed to preprocess image: {str(e)}")
+def pil_to_base64(pil_img):
+    """Converts a PIL image to a Base64 string."""
+    img_buffer = io.BytesIO()
+    pil_img.save(img_buffer, format="PNG")
+    return base64.b64encode(img_buffer.getvalue()).decode('utf-8')
 
-def perform_analysis(image_array, model_type, prompt_points=None, prompt_boxes=None):
-    """Perform medical image analysis using MedSAM2"""
-    try:
-        # Load the appropriate model
-        model_data = load_model(model_type)
-        predictor = model_data['predictor']
-        device = model_data['device']
-        
-        # Set the image for prediction
-        predictor.set_image(image_array)
-        
-        # Default to center point if no prompts provided
-        if prompt_points is None and prompt_boxes is None:
-            h, w = image_array.shape[:2]
-            # Use center point as default prompt
-            prompt_points = np.array([[w//2, h//2]])
-            point_labels = np.array([1])  # Foreground point
-        else:
-            point_labels = np.ones(len(prompt_points)) if prompt_points is not None else None
-        
-        # Perform prediction
-        masks, scores, logits = predictor.predict(
-            point_coords=prompt_points,
-            point_labels=point_labels,
-            box=prompt_boxes,
-            multimask_output=True
-        )
-        
-        # Convert to numpy if needed
-        if torch.is_tensor(masks):
-            masks = masks.cpu().numpy()
-        if torch.is_tensor(scores):
-            scores = scores.cpu().numpy()
-        if torch.is_tensor(logits):
-            logits = logits.cpu().numpy()
-        
-        return {
-            'masks': masks,
-            'scores': scores,
-            'logits': logits
-        }
-        
-    except Exception as e:
-        error_msg = f"Analysis failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        raise RuntimeError(error_msg)
+# --- Flask Routes ---
 
-def mask_to_base64(mask):
-    """Convert mask to base64 string for JSON response"""
-    # Convert mask to PIL Image
-    mask_image = Image.fromarray((mask * 255).astype(np.uint8))
+@app.route('/', methods=['GET', 'POST'])
+def web_interface():
+    """Handler for the main web page."""
+    available_models = MODEL_FILES + (['ViT_TB_Detection'] if VIT_MODEL is not None else [])
     
-    # Convert to base64
-    buffer = io.BytesIO()
-    mask_image.save(buffer, format='PNG')
-    mask_b64 = base64.b64encode(buffer.getvalue()).decode()
-    
-    return mask_b64
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return render_template('index.html', models=available_models, error="No file part in request.")
+        
+        file = request.files['file']
+        model_name = request.form.get('model')
 
-# HTML template for the web interface
-HTML_TEMPLATE = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>MedSAM2 Medical Image Analysis</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .container { background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px 0; }
-        .model-select { margin: 20px 0; }
-        select, input[type="file"], button { padding: 10px; margin: 5px; font-size: 16px; }
-        button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .results { margin-top: 20px; }
-        .error { color: red; background: #ffe6e6; padding: 10px; border-radius: 5px; }
-        .success { color: green; background: #e6ffe6; padding: 10px; border-radius: 5px; }
-        .image-container { display: flex; gap: 20px; flex-wrap: wrap; }
-        .image-box { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
-        img { max-width: 400px; height: auto; }
-    </style>
-</head>
-<body>
-    <h1>🏥 MedSAM2 Medical Image Analysis</h1>
-    
-    <div class="container">
-        <h2>Upload Medical Image</h2>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="upload-area">
-                <input type="file" id="imageFile" name="image" accept=".png,.jpg,.jpeg,.gif,.bmp,.tiff,.dcm" required>
-                <p>Choose a medical image file (PNG, JPG, JPEG, GIF, BMP, TIFF, DCM)</p>
-            </div>
-            
-            <div class="model-select">
-                <label for="modelType">Select Analysis Model:</label>
-                <select id="modelType" name="model_type" required>
-                    <option value="">-- Select Model --</option>
-                    <option value="general">General Medical Segmentation</option>
-                    <option value="heart_us">Ultrasound Heart Segmentation</option>
-                    <option value="liver_mri">MRI Liver Lesion Detection</option>
-                    <option value="ct_lesion">CT Lesion Detection</option>
-                    <option value="foundation">Foundation Model</option>
-                </select>
-            </div>
-            
-            <button type="submit">🔍 Analyze Image</button>
-        </form>
-    </div>
-    
-    <div id="results" class="results"></div>
-    
-    <script>
-        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData();
-            const imageFile = document.getElementById('imageFile').files[0];
-            const modelType = document.getElementById('modelType').value;
-            
-            if (!imageFile || !modelType) {
-                alert('Please select both an image and a model type');
-                return;
-            }
-            
-            formData.append('image', imageFile);
-            formData.append('model_type', modelType);
-            
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '<div class="container">🔄 Analyzing image...</div>';
-            
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
+        if file.filename == '':
+            return render_template('index.html', models=available_models, error="No file selected.")
+
+        if file and model_name:
+            try:
+                original_img = Image.open(file.stream)
                 
-                const result = await response.json();
-                
-                if (response.ok) {
-                    displayResults(result);
-                } else {
-                    resultsDiv.innerHTML = `<div class="container"><div class="error">Error: ${result.error}</div></div>`;
-                }
-            } catch (error) {
-                resultsDiv.innerHTML = `<div class="container"><div class="error">Network error: ${error.message}</div></div>`;
-            }
-        });
-        
-        function displayResults(result) {
-            const resultsDiv = document.getElementById('results');
-            let html = '<div class="container"><h2>📊 Analysis Results</h2>';
-            
-            html += `<div class="success">✅ Analysis completed successfully!</div>`;
-            html += `<p><strong>Model Used:</strong> ${result.model_description}</p>`;
-            html += `<p><strong>Processing Time:</strong> ${result.processing_time}</p>`;
-            html += `<p><strong>Number of Segments Found:</strong> ${result.num_segments}</p>`;
-            
-            if (result.masks && result.masks.length > 0) {
-                html += '<div class="image-container">';
-                result.masks.forEach((mask, index) => {
-                    html += `
-                        <div class="image-box">
-                            <h4>Segment ${index + 1} (Score: ${result.scores[index].toFixed(3)})</h4>
-                            <img src="data:image/png;base64,${mask}" alt="Segmentation Mask ${index + 1}">
-                        </div>
-                    `;
-                });
-                html += '</div>';
-            }
-            
-            html += '</div>';
-            resultsDiv.innerHTML = html;
-        }
-    </script>
-</body>
-</html>
-'''
+                if model_name == 'ViT_TB_Detection':
+                    # ViT analysis
+                    vit_results, result_img = analyze_with_vit(original_img)
+                    
+                    b64_original = pil_to_base64(original_img.convert("RGB"))
+                    b64_result = pil_to_base64(result_img)
+                    
+                    return render_template(
+                        'index.html',
+                        models=available_models,
+                        selected_model=model_name,
+                        original_image=b64_original,
+                        result_image=b64_result,
+                        vit_results=vit_results
+                    )
+                else:
+                    # MedSAM segmentation
+                    result_img = segment_image(original_img, model_name)
+                    
+                    b64_original = pil_to_base64(original_img.convert("RGB"))
+                    b64_result = pil_to_base64(result_img)
 
-@app.route('/')
-def index():
-    """Serve the main web interface"""
-    return render_template_string(HTML_TEMPLATE)
+                    return render_template(
+                        'index.html',
+                        models=available_models,
+                        selected_model=model_name,
+                        original_image=b64_original,
+                        result_image=b64_result
+                    )
+            except Exception as e:
+                return render_template('index.html', models=available_models, error=f"An error occurred: {e}")
 
-@app.route('/models', methods=['GET'])
-def get_models():
-    """Get available models"""
-    return jsonify({
-        'models': MODEL_CONFIGS,
-        'loaded_models': list(loaded_models.keys())
-    })
+    default_model = available_models[0] if available_models else None
+    return render_template('index.html', models=available_models, selected_model=default_model)
 
 @app.route('/analyze', methods=['POST'])
-def analyze_image():
-    """Main endpoint for image analysis"""
+def api_analyze():
+    """API endpoint for image analysis (segmentation or classification)."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in request."}), 400
+    
+    file = request.files['file']
+    available_models = list(MODELS.keys()) + (['ViT_TB_Detection'] if VIT_MODEL is not None else [])
+    model_name = request.form.get('model', available_models[-1] if available_models else None)
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected."}), 400
+
+    if model_name not in available_models:
+        return jsonify({"error": f"Model '{model_name}' not found or loaded."}), 404
+        
+    if file:
+        try:
+            original_img = Image.open(file.stream)
+            
+            if model_name == 'ViT_TB_Detection':
+                # ViT analysis - return JSON with results
+                vit_results, result_img = analyze_with_vit(original_img)
+                
+                # Convert result image to base64 for JSON response
+                b64_result = pil_to_base64(result_img)
+                
+                return jsonify({
+                    "prediction": vit_results['prediction'],
+                    "confidence": vit_results['confidence'],
+                    "heatmap_image": b64_result,
+                    "model_used": model_name
+                })
+            else:
+                # MedSAM segmentation - return image file
+                result_img = segment_image(original_img, model_name)
+                
+                img_buffer = io.BytesIO()
+                result_img.save(img_buffer, 'PNG')
+                img_buffer.seek(0)
+                
+                return send_file(img_buffer, mimetype='image/png')
+            
+        except Exception as e:
+            return jsonify({"error": f"An error occurred during processing: {e}"}), 500
+
+    return jsonify({"error": "Invalid request."}), 400
+
+@app.route('/vit_analyze', methods=['POST'])
+def api_vit_analyze():
+    """Dedicated API endpoint for ViT TB detection."""
+    if VIT_MODEL is None:
+        return jsonify({"error": "ViT model is not loaded."}), 503
+        
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in request."}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected."}), 400
+        
     try:
-        # Check if image file is present
-        if 'image' not in request.files:
-            return jsonify({'error': 'No image file provided'}), 400
+        original_img = Image.open(file.stream)
+        vit_results, heatmap_img = analyze_with_vit(original_img)
         
-        file = request.files['image']
-        model_type = request.form.get('model_type', 'general')
-        
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'File type not allowed'}), 400
-        
-        if model_type not in MODEL_CONFIGS:
-            return jsonify({'error': f'Invalid model type: {model_type}'}), 400
-        
-        # Save uploaded file
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        start_time = datetime.now()
-        
-        # Preprocess image
-        image_array, original_image = preprocess_image(filepath)
-        
-        # Get prompt points/boxes from request if provided
-        prompt_points = request.form.get('prompt_points')
-        prompt_boxes = request.form.get('prompt_boxes')
-        
-        if prompt_points:
-            prompt_points = json.loads(prompt_points)
-        if prompt_boxes:
-            prompt_boxes = json.loads(prompt_boxes)
-        
-        # Perform analysis
-        analysis_result = perform_analysis(image_array, model_type, prompt_points, prompt_boxes)
-        
-        end_time = datetime.now()
-        processing_time = str(end_time - start_time)
-        
-        # Convert masks to base64 for JSON response
-        masks_b64 = [mask_to_base64(mask) for mask in analysis_result['masks']]
-        
-        # Prepare response
-        response = {
-            'success': True,
-            'filename': filename,
-            'model_type': model_type,
-            'model_description': MODEL_CONFIGS[model_type]['description'],
-            'processing_time': processing_time,
-            'num_segments': len(analysis_result['masks']),
-            'masks': masks_b64,
-            'scores': analysis_result['scores'].tolist() if hasattr(analysis_result['scores'], 'tolist') else analysis_result['scores'],
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Clean up uploaded file
-        os.remove(filepath)
-        
-        return jsonify(response)
-        
-    except Exception as e:
-        # Log the full error for debugging
-        error_details = traceback.format_exc()
-        print(f"Analysis error: {error_details}")
+        # Convert heatmap to base64
+        b64_heatmap = pil_to_base64(heatmap_img)
         
         return jsonify({
-            'error': str(e),
-            'type': type(e).__name__
-        }), 500
+            "prediction": vit_results['prediction'],
+            "confidence": vit_results['confidence'],
+            "heatmap_image": b64_heatmap,
+            "success": True
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An error occurred during ViT analysis: {e}"}), 500
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'models_available': list(MODEL_CONFIGS.keys()),
-        'models_loaded': list(loaded_models.keys())
-    })
+@app.route('/models', methods=['GET'])
+def list_models():
+    """API endpoint to list all available models."""
+    available_models = {
+        "segmentation_models": list(MODELS.keys()),
+        "classification_models": ["ViT_TB_Detection"] if VIT_MODEL is not None else [],
+        "device": str(DEVICE)
+    }
+    return jsonify(available_models)
 
 if __name__ == '__main__':
-    print("🏥 Starting MedSAM2 Medical Image Analysis Server...")
-    print(f"Available models: {list(MODEL_CONFIGS.keys())}")
-    print("Server will be available at: http://localhost:5000")
+    # Ensure results directory exists
+    os.makedirs("results", exist_ok=True)
     
-    # Optionally pre-load a default model
-    if SAM_AVAILABLE:
-        try:
-            print("Pre-loading general model...")
-            load_model('general')
-            print("✅ General model loaded successfully")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not pre-load general model: {e}")
-    else:
-        print("⚠️  SAM dependencies not available. Please install required packages.")
-        print("Run: pip install torch torchvision segment-anything")
-    
-    app.run(debug=True, host='0.0.0.0', port=5100)
+    # First, ensure models are downloaded
+    download_models()
+    # Then, load models into memory
+    load_all_models()
+    # Start the Flask server
+    app.run(host='0.0.0.0', port=5001, debug=True)
