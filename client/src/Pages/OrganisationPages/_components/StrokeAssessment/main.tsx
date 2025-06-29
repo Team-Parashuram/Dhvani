@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
@@ -9,7 +10,6 @@ import VitalSigns from "./VitalSigns";
 import Symptoms from "./Symptoms";
 import ExclusionForm from "./ExclusionForm";
 import Upload from "./Upload";
-import Report from "./Report";
 
 const StrokeAssessment = () => {
   const [activeTab, setActiveTab] = useState("personal");
@@ -166,15 +166,9 @@ const StrokeAssessment = () => {
               )}
               
               {activeTab === "upload" && (
-                <Upload
-                  nextTab={() => setActiveTab("reports")}
-                  prevTab={() => setActiveTab("exclusion")}
-                />
+                <Upload />
               )}
               
-              {activeTab === "reports" && (
-                <Report prevTab={() => setActiveTab("upload")} />
-              )}
             </div>
           </CardContent>
         </Card>

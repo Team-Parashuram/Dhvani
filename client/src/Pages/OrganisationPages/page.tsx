@@ -10,7 +10,7 @@ import OrganizationBloodRequests from "./_components/BloodRequests"
 import BloodDonation from "./_components/BloodDonation"
 import OrganisationAnalytics from "./_components/OrganisationAnalytics"
 import Profile from "./_components/Profile"
-import StrokeAssessment from "./_components/StrokeAssessment/StrokeDetection"
+import StrokeAssessment from "./_components/StrokeAssessment/main"
 
 
 const Organisation = () => {

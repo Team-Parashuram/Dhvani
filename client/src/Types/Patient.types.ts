@@ -12,8 +12,8 @@ interface VitalSigns {
   HeartRate: string;
   Temperature: string;
   OxygenSaturation: string;
-  Height: Number;
-  Weight: Number
+  Height: number;
+  Weight: number
 }
 
 interface PatientExclusionList {
