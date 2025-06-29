@@ -68,19 +68,21 @@ def analyze_with_vit(image_pil):
     # Preprocess image
     input_tensor = vit_transform(image_pil).unsqueeze(0).to(DEVICE)
     
-    # Prediction
+    # Forward pass for prediction (no gradients needed)
     with torch.no_grad():
         output = VIT_MODEL(input_tensor)
         probs = torch.softmax(output, dim=1)[0]
         pred_class = torch.argmax(probs).item()
     
-    # Generate Grad-CAM heatmap
+    # Prepare input for Grad-CAM: enable gradients
+    input_tensor.requires_grad_(True)
+    
+    # Generate Grad-CAM heatmap (gradients must be tracked)
     target_layer = VIT_MODEL.patch_embed.proj
     cam = GradCAM(model=VIT_MODEL, target_layers=[target_layer])
     targets = [ClassifierOutputTarget(pred_class)]
-    
-    with torch.no_grad():
-        grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0]
+    # Note: no torch.no_grad() here
+    grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0]
     
     # Create overlay
     original_image = np.array(image_pil.resize((224, 224))) / 255.0

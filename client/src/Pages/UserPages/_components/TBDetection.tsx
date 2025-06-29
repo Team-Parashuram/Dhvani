@@ -101,7 +101,7 @@ const TBDetection = () => {
                 <h1 className={`text-2xl md:text-4xl font-bold ${
                     theme === "light" ? "text-gray-800" : "text-primary"
                 }`}>
-                    TB Detection with AI
+                    TB Detection
                 </h1>
                 <p className={`mt-2 text-sm ${
                     theme === "light" ? "text-gray-600" : "text-base-content/70"

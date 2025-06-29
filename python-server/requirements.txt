@@ -1,6 +1,5 @@
-# requirements.txt
-
 flask
+flask-cors
 torch
 torchvision
 numpy
@@ -10,5 +9,3 @@ timm
 opencv-python
 matplotlib
 grad-cam
-flask-cors
-pytorch-grad-cam 
