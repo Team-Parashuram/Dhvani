@@ -67,7 +67,7 @@ medical-image-analysis/
 
 ### Start the Server
 ```bash
-python app.py
+python med-server.py
 ```
 
 The server will be available at `http://localhost:5001`
