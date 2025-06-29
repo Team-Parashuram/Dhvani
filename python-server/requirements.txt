@@ -10,3 +10,4 @@ timm
 opencv-python
 matplotlib
 grad-cam
+segment-anything-2-medsam @ git+https://github.com/bowang-lab/MedSAM.git#subdirectory=segment_anything_2
