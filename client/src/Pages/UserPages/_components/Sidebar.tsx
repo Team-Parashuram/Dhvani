@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, Droplet, Hospital, ClipboardList, User2, FileText, Activity, Upload } from "lucide-react"
+import { ChevronLeft, ChevronRight, Droplet, Hospital, ClipboardList, Utensils, User2, FileText, Activity, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,7 +22,7 @@ const sidebarItems = [
     {icon: Hospital, label: "Find Hospital near me", id: "find-hospital"},
     { icon: Droplet, label: "Blood Availability", id: "availability" },
     { icon: ClipboardList, label: "Blood Requests", id: "requests" },
-    { icon: ClipboardList, label: "Diet Planner", id: "diet-planner" },
+    { icon: Utensils, label: "Diet Planner", id: "diet-planner" },
     { icon: User2, label: "My Profile", id: "profile" },
 ]
 

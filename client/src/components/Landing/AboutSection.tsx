@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { useThemeStore } from "@/store/themeStore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Heart, Target, Eye, Award, Users, Globe } from "lucide-react"
+import { Heart, Target, Eye, Award, Globe } from "lucide-react"
 
 const AboutSection = () => {
     const { theme } = useThemeStore()

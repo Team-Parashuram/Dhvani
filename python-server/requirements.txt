@@ -10,3 +10,5 @@ timm
 opencv-python
 matplotlib
 grad-cam
+flask-cors
+pytorch-grad-cam 
