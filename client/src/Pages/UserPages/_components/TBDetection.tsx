@@ -385,98 +385,69 @@ const TBDetection = () => {
                                             <div className={`text-sm ${
                                                 theme === "light" ? "text-gray-600" : "text-base-content/70"
                                             }`}>
-                                                <p className="mb-1">
+                                                {/* <p className="mb-1">
                                                     <strong>TB Detection Confidence:</strong> {(analysisResult.confidence.tb_detected * 100).toFixed(1)}%
                                                 </p>
                                                 <p>
                                                     <strong>Normal Confidence:</strong> {(analysisResult.confidence.normal * 100).toFixed(1)}%
-                                                </p>
+                                                </p> */}
                                             </div>
                                         </AlertDescription>
                                     </Alert>
                                 </CardContent>
                             </Card>
 
-                            {/* Image Comparison */}
+                           {/* Visual Analysis */}
                             <Card className={`${
                                 theme === "light"
                                     ? "bg-white border-gray-200 shadow-sm"
                                     : "bg-base-200/50 backdrop-blur-sm border-primary/10"
                             }`}>
-                                <CardHeader>
-                                    <CardTitle className={`flex items-center ${
-                                        theme === "light" ? "text-gray-800" : ""
-                                    }`}>
-                                        <Eye className="w-6 h-6 mr-2 text-green-500" />
-                                        Visual Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        {originalImage && (
-                                            <motion.div 
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: 0.1 }}
-                                                className="space-y-3"
-                                            >
-                                                <div className="flex items-center">
-                                                    <Image className={`w-4 h-4 mr-2 ${
-                                                        theme === "light" ? "text-gray-500" : "text-base-content/70"
-                                                    }`} />
-                                                    <h4 className={`text-sm font-semibold uppercase tracking-wide ${
-                                                        theme === "light" ? "text-gray-700" : "text-base-content"
-                                                    }`}>
-                                                        Original X-Ray
-                                                    </h4>
-                                                </div>
-                                                <div className={`border rounded-lg overflow-hidden ${
-                                                    theme === "light" ? "border-gray-200 shadow-sm" : "border-base-300"
-                                                }`}>
-                                                    <img 
-                                                        src={originalImage} 
-                                                        alt="Original X-ray" 
-                                                        className="object-cover w-full h-64 transition-transform duration-300 hover:scale-105"
-                                                    />
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                        
-                                        {heatmapImage && (
-                                            <motion.div 
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: 0.2 }}
-                                                className="space-y-3"
-                                            >
-                                                <div className="flex items-center">
-                                                    <Zap className={`w-4 h-4 mr-2 ${
-                                                        theme === "light" ? "text-gray-500" : "text-base-content/70"
-                                                    }`} />
-                                                    <h4 className={`text-sm font-semibold uppercase tracking-wide ${
-                                                        theme === "light" ? "text-gray-700" : "text-base-content"
-                                                    }`}>
-                                                        AI Heatmap Analysis
-                                                    </h4>
-                                                </div>
-                                                <div className={`border rounded-lg overflow-hidden ${
-                                                    theme === "light" ? "border-gray-200 shadow-sm" : "border-base-300"
-                                                }`}>
-                                                    <img 
-                                                        src={heatmapImage} 
-                                                        alt="AI Heatmap" 
-                                                        className="object-cover w-full h-64 transition-transform duration-300 hover:scale-105"
-                                                    />
-                                                </div>
-                                                <p className={`text-xs ${
-                                                    theme === "light" ? "text-gray-500" : "text-base-content/60"
-                                                }`}>
-                                                    Red/warm areas indicate regions of interest detected by AI
-                                                </p>
-                                            </motion.div>
-                                        )}
+                            <CardHeader>
+                                <CardTitle className={`flex items-center ${
+                                    theme === "light" ? "text-gray-800" : ""
+                                }`}>
+                                <Eye className="w-6 h-6 mr-2 text-green-500" />
+                                Visual Analysis
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                {/* Always show original image */}
+                                {originalImage && (
+                                    <div className="space-y-3">
+                                    <h4 className="text-sm font-semibold">Original X‑ray</h4>
+                                    <img 
+                                        src={originalImage} 
+                                        alt="Original X‑ray" 
+                                        className="object-cover w-full h-64 rounded-lg"
+                                    />
                                     </div>
-                                </CardContent>
+                                )}
+
+                                {/* Show heatmap only if TB Detected */}
+                                {analysisResult.prediction === "TB Detected" && heatmapImage && (
+                                    <div className="space-y-3">
+                                    <h4 className="text-sm font-semibold">AI Heatmap</h4>
+                                    <img 
+                                        src={heatmapImage} 
+                                        alt="AI Heatmap" 
+                                        className="object-cover w-full h-64 rounded-lg"
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                        Red areas = regions of highest TB attention
+                                    </p>
+                                    </div>
+                                )}
+
+                                {/* Friendly “normal” message */}
+                                {analysisResult.prediction === "Normal" && (
+                                    <div className="col-span-full text-center text-sm text-green-600">
+                                    No suspicious patterns detected — TB confidence {(analysisResult.confidence.tb_detected * 100).toFixed(1)}%
+                                    </div>
+                                )}
+                                </div>
+                            </CardContent>
                             </Card>
 
                             {/* Medical Disclaimer */}

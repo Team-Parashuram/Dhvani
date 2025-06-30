@@ -33,9 +33,11 @@ VIT_LABEL_MAP = {0: "Normal", 1: "TB Detected"}
 vit_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std =[0.229, 0.224, 0.225]
+    )
 ])
-
 def load_vit_model():
     """Loads the ViT model for TB detection."""
     global VIT_MODEL
@@ -55,10 +57,13 @@ def load_vit_model():
     except Exception as e:
         print(f"Failed to load ViT model. Error: {e}")
 
+
+TB_THRESHOLD = 0.85   # require at least 85% TB confidence to call it positive
+
 def analyze_with_vit(image_pil):
     """
-    Performs TB detection using ViT model and generates Grad-CAM heatmap.
-    Returns prediction results and heatmap overlay image.
+    Performs TB detection using ViT model and generates Grad-CAM heatmap only if TB is detected.
+    Returns prediction results and optionally a heatmap PIL image (None if no TB).
     """
     if VIT_MODEL is None:
         raise ValueError("ViT model is not loaded.")
@@ -72,30 +77,28 @@ def analyze_with_vit(image_pil):
     with torch.no_grad():
         output = VIT_MODEL(input_tensor)
         probs = torch.softmax(output, dim=1)[0]
-        pred_class = torch.argmax(probs).item()
+        tb_score = float(probs[1])
+        pred_class = 1 if tb_score >= TB_THRESHOLD else 0
     
-    # Prepare input for Grad-CAM: enable gradients
-    input_tensor.requires_grad_(True)
-    
-    # Generate Grad-CAM heatmap (gradients must be tracked)
-    target_layer = VIT_MODEL.patch_embed.proj
-    cam = GradCAM(model=VIT_MODEL, target_layers=[target_layer])
-    targets = [ClassifierOutputTarget(pred_class)]
-    # Note: no torch.no_grad() here
-    grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0]
-    
-    # Create overlay
-    original_image = np.array(image_pil.resize((224, 224))) / 255.0
-    cam_image = show_cam_on_image(original_image, grayscale_cam, use_rgb=True)
-    cam_image_pil = Image.fromarray(cam_image)
+    cam_image_pil = None
+    if pred_class == 1:
+        # Compute Grad-CAM only for positive cases
+        input_tensor.requires_grad_(True)
+        target_layer = VIT_MODEL.patch_embed.proj
+        cam = GradCAM(model=VIT_MODEL, target_layers=[target_layer])
+        targets = [ClassifierOutputTarget(pred_class)]
+        grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0]
+        
+        original_image = np.array(image_pil.resize((224, 224))) / 255.0
+        cam_image = show_cam_on_image(original_image, grayscale_cam, use_rgb=True)
+        cam_image_pil = Image.fromarray(cam_image)
     
     processing_time = time.time() - start_time
     
-    # Prepare results
     results = {
         'prediction': VIT_LABEL_MAP[pred_class],
         'confidence': {
-            'tb_detected': float(probs[1]),
+            'tb_detected': tb_score,
             'normal': float(probs[0])
         },
         'predicted_class': pred_class,
@@ -103,6 +106,7 @@ def analyze_with_vit(image_pil):
     }
     
     return results, cam_image_pil
+
 
 def pil_to_base64(pil_img):
     """Converts a PIL image to a Base64 string."""
@@ -156,21 +160,16 @@ def api_vit_analyze():
     try:
         # Load and validate image
         original_img = Image.open(file.stream)
-        
-        # Convert to RGB if necessary
         if original_img.mode != 'RGB':
             original_img = original_img.convert('RGB')
         
-        # Perform analysis
         vit_results, heatmap_img = analyze_with_vit(original_img)
-        
-        # Convert heatmap to base64
-        b64_heatmap = pil_to_base64(heatmap_img)
+        b64_heatmap = pil_to_base64(heatmap_img) if heatmap_img is not None else None
         
         return jsonify({
             "prediction": vit_results['prediction'],
             "confidence": vit_results['confidence'],
-            "heatmap_image": b64_heatmap,
+            "heatmap_image": b64_heatmap,      # null for "Normal"
             "processing_time": vit_results['processing_time'],
             "success": True
         })
