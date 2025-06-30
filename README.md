@@ -119,6 +119,7 @@ Each service/module generally has its own dependencies and setup procedures. Ref
     ```bash
     cd <go_module_directory>
     # Configure .env file with database details, API keys, client URLs, etc.
+    go get
     go mod tidy
     go run main.go
     ```
