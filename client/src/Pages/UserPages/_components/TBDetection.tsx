@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { motion } from "framer-motion"
 import { useThemeStore } from "@/store/themeStore"
-import { Upload, FileText, AlertCircle, CheckCircle, Eye, Activity, Brain, Scan, Image, Zap, Target, Stethoscope } from "lucide-react"
+import { Upload, FileText, AlertCircle, CheckCircle, Eye, Activity, Brain, Scan, Image, Target, Stethoscope } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
